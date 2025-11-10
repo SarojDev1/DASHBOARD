@@ -4,18 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fire Scrim Command Center</title>
-    <!-- Load Tailwind CSS -->
+    <!-- Load Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Lucide Icons -->
-    <script type="module">
-        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Shield, Users } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
-        document.addEventListener('DOMContentLoaded', () => {
-            createIcons({
-                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Shield, Users },
-                attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
-            });
-        });
-    </script>
+    
+    <!-- Custom Styling and Fonts -->
     <style>
         /* Custom Gaming Theme Colors and Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue:wght@400;700&display=swap');
@@ -29,10 +21,6 @@
         
         /* Dark Card Background (Deep Blue/Purple) */
         .bg-ff-card { background-color: #1a1a2e; }
-        /* Admin Accent (For Credit Tool) */
-        .bg-admin-card { background-color: #311b92; }
-        .border-admin { border-color: #7c4dff; }
-        .text-admin { color: #7c4dff; }
 
         /* Sidebar Transition and Size */
         #sidebar {
@@ -83,6 +71,17 @@
             border-color: #ff3300;
         }
     </style>
+    
+    <!-- Load Lucide Icons from CDN and initialize on load -->
+    <script type="module">
+        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            createIcons({
+                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users },
+                attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
+            });
+        });
+    </script>
 </head>
 <body class="text-gray-100 min-h-screen p-4 sm:p-8">
 
@@ -93,22 +92,32 @@
         import { getFirestore, doc, onSnapshot, collection, query, setDoc, addDoc, updateDoc, deleteDoc, runTransaction, getDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { createIcons, XCircle, CheckCircle } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
 
-        // Global Firebase variables
+        // Global Firebase variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- FIX: Rely on the environment to inject the correct key. ---
+        // --- Defensive Firebase Configuration Block (Ensures projectId exists) ---
         const firebaseConfig = (() => {
+            // A minimal, complete configuration structure with fallbacks
+            const defaultConfig = {
+                apiKey: "", 
+                authDomain: "",
+                // CRITICAL FALLBACK: Ensure projectId is always present
+                projectId: "scrim-platform-default", 
+                storageBucket: "",
+                messagingSenderId: "",
+                appId: appId 
+            };
+            
             try {
-                // Safely parse the config string provided by the environment.
                 const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
                 const parsedConfig = JSON.parse(configString);
-                // Return the parsed object. If it's an empty object, let initializeApp handle it.
-                return typeof parsedConfig === 'object' && parsedConfig !== null ? parsedConfig : {};
+                
+                // Merge parsed config with defaults, prioritizing parsed values.
+                return { ...defaultConfig, ...parsedConfig };
             } catch (e) {
-                // If parsing fails, return an empty object to prevent a crash
-                console.error("Failed to parse __firebase_config. Returning empty config object.", e);
-                return {};
+                console.error("Failed to parse __firebase_config. Using robust default config.", e);
+                return defaultConfig;
             }
         })();
         // ------------------------------------------------------------------------
@@ -117,9 +126,9 @@
         let isAuthReady = false;
         let allScrims = []; 
         let viewMode = 'running'; 
-        let isAdmin = false; 
         let currentWalletBalance = 0; 
 
+        // Firestore Path Definitions
         const SCRIM_COLLECTION = `artifacts/${appId}/public/data/scrims`;
         const USER_WALLET_PATH = (uid) => `artifacts/${appId}/users/${uid}/wallet/balance`;
 
@@ -132,15 +141,14 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // 1. Attempt to sign in using the secure custom token provided by the environment
+                // Sign-in flow: use custom token if available, otherwise sign in anonymously
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    // 2. Fallback to anonymous sign-in if the custom token is not available
                     await signInAnonymously(auth);
                 }
 
-                // 3. Set up the state change listener AFTER the initial sign-in attempt
+                // Set up the state change listener AFTER the initial sign-in attempt
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
@@ -155,31 +163,19 @@
                         updateMainView(); 
                     } else {
                         userId = null;
-                        isAuthReady = false; // Should not happen in this setup, but good practice
+                        isAuthReady = false; 
                         document.getElementById('app-status').textContent = "Status: Offline (Sign-in failed)";
                     }
                 });
 
             } catch (error) {
+                // Display the error message clearly in the UI
                 document.getElementById('app-status').textContent = `FATAL ERROR: ${error.message}`;
+                console.error("Firebase Initialization Failure:", error);
             }
         };
 
         // --- UI Functions ---
-
-        const renderAdminPanel = () => {
-            const adminPanel = document.getElementById('admin-credit-panel');
-            if (isAdmin) {
-                adminPanel.classList.remove('hidden');
-            } else {
-                adminPanel.classList.add('hidden');
-            }
-        };
-        window.toggleAdmin = () => {
-            isAdmin = !isAdmin;
-            renderAdminPanel();
-            showMessage(`Admin tool visibility: ${isAdmin ? 'ON' : 'OFF'}.`, 'info');
-        };
 
         const toggleMenu = () => {
             const sidebar = document.getElementById('sidebar');
@@ -230,6 +226,7 @@
                     aboutEl.classList.remove('hidden');
                     break;
             }
+            // Re-render Lucide icons for the title element after innerHTML change
             import('https://unpkg.com/lucide@latest/dist/esm/lucide.js')
                 .then(({ createIcons, Swords, ListChecks, Info }) => {
                     createIcons({
@@ -265,7 +262,7 @@
         const setupRealtimeListeners = () => {
             if (!db || !userId) return;
 
-            // 1. Scrims Listener
+            // 1. Scrims Listener (Public Data)
             const scrimsQuery = query(collection(db, SCRIM_COLLECTION));
             onSnapshot(scrimsQuery, (snapshot) => {
                 allScrims = [];
@@ -275,7 +272,7 @@
                 updateMainView(); 
             }, (error) => console.error("Error listening to scrims:", error));
 
-            // 2. Wallet Listener
+            // 2. Wallet Listener (Private User Data)
             const walletDocRef = doc(db, USER_WALLET_PATH(userId));
             onSnapshot(walletDocRef, (docSnap) => {
                 const balance = docSnap.exists() ? docSnap.data().balance : 0;
@@ -302,6 +299,8 @@
         const updateWalletBalance = async (uid, amount) => {
             if (!db) throw new Error("Database not initialized.");
             const walletDocRef = doc(db, USER_WALLET_PATH(uid));
+            
+            // Use transaction for safe balance update
             return runTransaction(db, async (transaction) => {
                 const docSnap = await transaction.get(walletDocRef);
                 const currentBalance = docSnap.exists() ? docSnap.data().balance : 0;
@@ -316,33 +315,6 @@
             });
         };
         
-        // --- ADMIN FUNCTION: Grant Credits ---
-        const addCreditsHandler = async (e) => {
-            e.preventDefault();
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
-
-            const targetId = document.getElementById('admin-target-id').value.trim();
-            const amount = parseInt(document.getElementById('admin-amount').value);
-
-            // Use crypto.randomUUID() as a fallback for the admin tool if target ID is blank
-            const effectiveTargetId = targetId || crypto.randomUUID();
-
-            if (amount <= 0 || isNaN(amount)) {
-                return showMessage("Amount must be a positive number.", "error");
-            }
-
-            try {
-                await updateWalletBalance(effectiveTargetId, amount);
-                document.getElementById('admin-credit-form').reset();
-                showMessage(`Successfully granted ${amount.toLocaleString()} C to OP ID: ${effectiveTargetId.substring(0, 8)}...`, "success");
-
-            } catch (error) {
-                showMessage(`Failed to grant credits: ${error.message}`, "error");
-            }
-        };
-        window.addCreditsHandler = addCreditsHandler; 
-
-
         const createScrim = async (e) => {
             e.preventDefault();
             if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
@@ -360,10 +332,12 @@
             }
 
             try {
+                // 1. Deduct entry fee before creating the document
                 if (isPaid) {
                     await updateWalletBalance(userId, -entryFee);
                 }
 
+                // 2. Create the Scrim Document
                 await addDoc(collection(db, SCRIM_COLLECTION), {
                     creatorId: userId,
                     title: title,
@@ -379,6 +353,7 @@
                 toggleEntryFee(false); 
 
             } catch (error) {
+                // If updateWalletBalance failed (e.g., insufficient funds), catch it here
                 if (error.message.includes("Insufficient funds")) {
                     showMessage("Failed to launch: Insufficient credits for entry fee.", "error");
                 } else {
@@ -396,10 +371,12 @@
             if (scrim.joiners.length >= scrim.maxPlayers) return showMessage("This scrim is full.", "error");
 
             try {
+                // 1. Deduct entry fee if required
                 if (scrim.entryFee > 0) {
                     await updateWalletBalance(userId, -scrim.entryFee);
                 }
 
+                // 2. Update the document to add the new joiner
                 const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
                 const newJoiner = { id: userId, name: `User_${userId.substring(0, 4)}`, paid: true };
                 const newJoiners = [...scrim.joiners, newJoiner];
@@ -424,7 +401,9 @@
             showConfirmationModal(`Award the ${scrim.prize} credit prize for "${scrim.title}" to yourself?`, async () => {
                 try {
                     const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
+                    // Update status first
                     await updateDoc(scrimDocRef, { status: 'Finished' });
+                    // Award the prize
                     await updateWalletBalance(userId, scrim.prize);
                     showMessage(`Scrim "${scrim.title}" finished! Prize loaded into wallet.`, "success");
 
@@ -541,6 +520,7 @@
                 return;
             }
 
+            // Sort data locally since orderBy() is avoided in queries
             scrims.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
             scrims.forEach(scrim => {
@@ -549,6 +529,7 @@
                 const isFull = scrim.joiners.length >= scrim.maxPlayers;
 
                 let actionButton = '';
+                // Display only a short version of the creator's ID for UI clarity
                 const creatorDisplayId = `User_${scrim.creatorId.substring(0, 6)}`;
                 const creatorColor = isCreator ? 'text-green-400' : 'text-ff-accent';
 
@@ -602,6 +583,7 @@
                 `;
                 container.appendChild(scrimElement);
                 
+                // Re-render Lucide icons for the new scrim element
                 createIcons({
                     icons: { XCircle, CheckCircle },
                     attrs: { width: 18, height: 18, class: 'inline-block' },
@@ -636,6 +618,7 @@
 
             messageEl.textContent = message;
 
+            // Recreate the confirm button to clear any previous event listeners
             const newConfirmBtn = confirmBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
             
@@ -649,16 +632,20 @@
             modal.classList.remove('hidden');
         };
 
-        // --- Export Wrappers (FIXED: Added isAuthReady check) ---
+        // --- Export Wrappers to ensure authentication readiness ---
         window.joinScrimWrapper = async (scrimId) => {
             if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
             if (!db) return showMessage("Database not ready.", "error");
 
-            const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
-            if (scrimDocSnap.exists()) {
-                joinScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
-            } else {
-                showMessage("Scrim not found.", "error");
+            try {
+                const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
+                if (scrimDocSnap.exists()) {
+                    joinScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
+                } else {
+                    showMessage("Scrim not found.", "error");
+                }
+            } catch(e) {
+                showMessage(`Error fetching scrim: ${e.message}`, "error");
             }
         };
 
@@ -666,11 +653,15 @@
             if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
             if (!db) return showMessage("Database not ready.", "error");
 
-            const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
-            if (scrimDocSnap.exists()) {
-                finishScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
-            } else {
-                showMessage("Scrim not found.", "error");
+            try {
+                const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
+                if (scrimDocSnap.exists()) {
+                    finishScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
+                } else {
+                    showMessage("Scrim not found.", "error");
+                }
+            } catch(e) {
+                showMessage(`Error fetching scrim: ${e.message}`, "error");
             }
         };
 
@@ -686,7 +677,7 @@
         });
     </script>
 
-    <!-- Main App Content Container (Now visible on load) -->
+    <!-- Main App Content Container -->
     <div id="main-app-content">
 
         <!-- Sidebar Menu -->
@@ -782,26 +773,6 @@
                     </form>
                 </section>
                 
-                <!-- ADMIN CREDIT GRANT PANEL (Hidden by default) -->
-                <section id="admin-credit-panel" class="bg-admin-card p-6 rounded-xl shadow-2xl border border-admin hidden">
-                    <h2 class="text-3xl font-bold mb-6 flex items-center text-white border-b border-admin pb-2">
-                        <span data-lucide="Shield" class="text-admin"></span> Admin Credit Tool
-                    </h2>
-                    <p class="text-sm text-gray-300 mb-4">Transfer credits to any player's **OP ID**. (Use `window.toggleAdmin()` in console to hide/show this panel.)</p>
-                    <form id="admin-credit-form" onsubmit="window.addCreditsHandler(event)" class="space-y-4">
-                        <div>
-                            <label for="admin-target-id" class="block text-sm font-medium text-gray-300">Target OP ID (User ID)</label>
-                            <input type="text" id="admin-target-id" placeholder="Paste the full user ID here or leave blank for a random ID..." class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                        </div>
-                        <div>
-                            <label for="admin-amount" class="block text-sm font-medium text-gray-300">Credit Amount to Grant (C)</label>
-                            <input type="number" id="admin-amount" required min="1" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                        </div>
-                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-extrabold py-3 rounded-xl transition duration-200 shadow-lg hover:shadow-xl uppercase text-lg transform hover:scale-[1.01]">
-                            <span data-lucide="Wallet" class="text-white"></span> Grant Credits
-                        </button>
-                    </form>
-                </section>
             </div>
 
 
@@ -823,8 +794,8 @@
                     <h3 class="text-2xl font-bold text-ff-accent mb-3 flex items-center"><span data-lucide="Users" class="text-ff-accent"></span> Platform Overview</h3>
                     <ul class="list-disc list-inside text-gray-400 space-y-2">
                         <li>**Persistence:** Scrims and Wallets are saved across sessions using Firestore.</li>
-                        <li>**Economy:** New users start with **0 Credits (C)**. Use the **Admin Credit Tool** to fund accounts for testing.</li>
-                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer, which is needed for admin grants and transactions.</li>
+                        <li>**Economy:** New users start with **0 Credits (C)**. To start playing paid scrims, use the **Deposit Credits** tab in the Wallet Menu.</li>
+                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer, which is needed for transactions.</li>
                         <li>**Cleanup:** Only the **Creator** can finish a match (to award the prize) and then delete the scrim from the Finished Matches tab.</li>
                     </ul>
                 </div>
@@ -853,7 +824,7 @@
         </div>
     </div>
     
-    <!-- Wallet Management Modal (Unchanged) -->
+    <!-- Wallet Management Modal -->
     <div id="wallet-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] hidden">
         <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-ff-accent">
             <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
