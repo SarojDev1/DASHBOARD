@@ -95,9 +95,28 @@
 
         // Global Firebase variables
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        // Global Auth Token (automatically provided by the Canvas environment)
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- FIX: Provide a dummy config if the environment variable is missing ---
+        const dummyFirebaseConfig = {
+            apiKey: "dummy-key",
+            authDomain: "dummy-domain.firebaseapp.com",
+            projectId: "dummy-project-id",
+            storageBucket: "dummy-storage.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdefgh12345678",
+            measurementId: "G-DUMMY"
+        };
+        const firebaseConfig = (() => {
+            try {
+                const config = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : null);
+                return config || dummyFirebaseConfig;
+            } catch (e) {
+                console.error("Failed to parse __firebase_config, using dummy config.", e);
+                return dummyFirebaseConfig;
+            }
+        })();
+        // ------------------------------------------------------------------------
 
         let db, auth, userId = null;
         let isAuthReady = false;
@@ -113,11 +132,6 @@
 
         // --- Core Firebase Initialization and Authentication ---
         const initFirebase = async () => {
-            if (!firebaseConfig) {
-                document.getElementById('app-status').textContent = "ERROR: Firebase config missing.";
-                return;
-            }
-
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -642,7 +656,7 @@
 
         // --- Export Wrappers (FIXED: Added isAuthReady check) ---
         window.joinScrimWrapper = async (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
             if (!db) return showMessage("Database not ready.", "error");
 
             const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
@@ -654,7 +668,7 @@
         };
 
         window.finishScrimWrapper = async (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
             if (!db) return showMessage("Database not ready.", "error");
 
             const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
@@ -666,7 +680,7 @@
         };
 
         window.deleteScrimWrapper = (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
             deleteScrim(scrimId);
         };
 
