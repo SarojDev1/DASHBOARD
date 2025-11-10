@@ -97,23 +97,18 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- FIX: Provide a dummy config if the environment variable is missing ---
-        const dummyFirebaseConfig = {
-            apiKey: "dummy-key",
-            authDomain: "dummy-domain.firebaseapp.com",
-            projectId: "dummy-project-id",
-            storageBucket: "dummy-storage.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdefgh12345678",
-            measurementId: "G-DUMMY"
-        };
+        // --- FIX: Rely on the environment to inject the correct key. ---
         const firebaseConfig = (() => {
             try {
-                const config = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : null);
-                return config || dummyFirebaseConfig;
+                // Safely parse the config string provided by the environment.
+                const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+                const parsedConfig = JSON.parse(configString);
+                // Return the parsed object. If it's an empty object, let initializeApp handle it.
+                return typeof parsedConfig === 'object' && parsedConfig !== null ? parsedConfig : {};
             } catch (e) {
-                console.error("Failed to parse __firebase_config, using dummy config.", e);
-                return dummyFirebaseConfig;
+                // If parsing fails, return an empty object to prevent a crash
+                console.error("Failed to parse __firebase_config. Returning empty config object.", e);
+                return {};
             }
         })();
         // ------------------------------------------------------------------------
