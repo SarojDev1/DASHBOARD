@@ -133,19 +133,20 @@
 
                 // 3. Set up the state change listener AFTER the initial sign-in attempt
                 onAuthStateChanged(auth, (user) => {
-                    isAuthReady = true;
                     if (user) {
                         userId = user.uid;
                         document.getElementById('current-user-id').textContent = userId;
                         document.getElementById('app-status').textContent = "Status: Online (Authenticated)";
                         document.getElementById('main-app-content').classList.remove('opacity-0', 'pointer-events-none');
+                        
+                        // Set readiness flag to TRUE only after user ID is confirmed
+                        isAuthReady = true; 
 
                         setupRealtimeListeners();
                         updateMainView(); 
                     } else {
-                        // This case should ideally not happen after successful sign-in, 
-                        // but serves as a safety net.
                         userId = null;
+                        isAuthReady = false; // Should not happen in this setup, but good practice
                         document.getElementById('app-status').textContent = "Status: Offline (Sign-in failed)";
                     }
                 });
@@ -639,9 +640,11 @@
             modal.classList.remove('hidden');
         };
 
-        // --- Export Wrappers ---
+        // --- Export Wrappers (FIXED: Added isAuthReady check) ---
         window.joinScrimWrapper = async (scrimId) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
             if (!db) return showMessage("Database not ready.", "error");
+
             const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
             if (scrimDocSnap.exists()) {
                 joinScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
@@ -651,7 +654,9 @@
         };
 
         window.finishScrimWrapper = async (scrimId) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
             if (!db) return showMessage("Database not ready.", "error");
+
             const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
             if (scrimDocSnap.exists()) {
                 finishScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
@@ -661,6 +666,7 @@
         };
 
         window.deleteScrimWrapper = (scrimId) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); // <--- FIX
             deleteScrim(scrimId);
         };
 
