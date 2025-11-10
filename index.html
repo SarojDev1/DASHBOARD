@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Scrim Command Center</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons -->
+    <script type="module">
+        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Shield, Users } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            createIcons({
+                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Shield, Users },
+                attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
+            });
+        });
+    </script>
+    <style>
+        /* Custom Gaming Theme Colors and Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0d0d1a; }
+        h1, h2, #sidebar h2 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+
+        /* Custom Free Fire Accent (High-Energy Red/Orange) */
+        .bg-ff-accent { background-color: #ff3300; }
+        .text-ff-accent { color: #ff3300; }
+        .border-ff-accent { border-color: #ff3300; }
+        
+        /* Dark Card Background (Deep Blue/Purple) */
+        .bg-ff-card { background-color: #1a1a2e; }
+        /* Admin Accent (For Credit Tool) */
+        .bg-admin-card { background-color: #311b92; }
+        .border-admin { border-color: #7c4dff; }
+        .text-admin { color: #7c4dff; }
+
+        /* Sidebar Transition and Size */
+        #sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 80%;
+            max-width: 300px;
+        }
+
+        /* Scrim Item Enhancements */
+        .scrim-item {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid #262640;
+        }
+        .scrim-item:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 8px 25px rgba(255, 51, 0, 0.25);
+            border-color: #ff3300;
+        }
+        
+        /* Input/Form Focus */
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255, 51, 0, 0.5);
+        }
+
+        /* Scrollbar */
+        .scrim-list-container {
+            max-height: 70vh; 
+            overflow-y: auto;
+            border-radius: 0.75rem;
+        }
+        .scrim-list-container::-webkit-scrollbar { width: 8px; }
+        .scrim-list-container::-webkit-scrollbar-thumb { background-color: #ff3300; border-radius: 4px; }
+        .scrim-list-container::-webkit-scrollbar-track { background-color: #0d0d1a; }
+
+        /* Form styling */
+        .form-panel {
+            box-shadow: 0 0 40px rgba(255, 51, 0, 0.1); 
+        }
+        .form-input-field {
+            background-color: #262640;
+            border: 1px solid #3d3d57;
+            transition: all 0.2s;
+        }
+        .form-input-field:focus {
+            background-color: #1a1a2e;
+            border-color: #ff3300;
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen p-4 sm:p-8">
+
+    <!-- Firebase Initialization and Utility Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, setDoc, addDoc, updateDoc, deleteDoc, runTransaction, getDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { createIcons, XCircle, CheckCircle } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+
+        // Global Firebase variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        // Global Auth Token (automatically provided by the Canvas environment)
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let isAuthReady = false;
+        let allScrims = []; 
+        let viewMode = 'running'; 
+        let isAdmin = false; 
+        let currentWalletBalance = 0; 
+
+        const SCRIM_COLLECTION = `artifacts/${appId}/public/data/scrims`;
+        const USER_WALLET_PATH = (uid) => `artifacts/${appId}/users/${uid}/wallet/balance`;
+
+        setLogLevel('debug');
+
+        // --- Core Firebase Initialization and Authentication ---
+        const initFirebase = async () => {
+            if (!firebaseConfig) {
+                document.getElementById('app-status').textContent = "ERROR: Firebase config missing.";
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // 1. Attempt to sign in using the secure custom token provided by the environment
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // 2. Fallback to anonymous sign-in if the custom token is not available
+                    await signInAnonymously(auth);
+                }
+
+                // 3. Set up the state change listener AFTER the initial sign-in attempt
+                onAuthStateChanged(auth, (user) => {
+                    isAuthReady = true;
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('current-user-id').textContent = userId;
+                        document.getElementById('app-status').textContent = "Status: Online (Authenticated)";
+                        document.getElementById('main-app-content').classList.remove('opacity-0', 'pointer-events-none');
+
+                        setupRealtimeListeners();
+                        updateMainView(); 
+                    } else {
+                        // This case should ideally not happen after successful sign-in, 
+                        // but serves as a safety net.
+                        userId = null;
+                        document.getElementById('app-status').textContent = "Status: Offline (Sign-in failed)";
+                    }
+                });
+
+            } catch (error) {
+                document.getElementById('app-status').textContent = `FATAL ERROR: ${error.message}`;
+            }
+        };
+
+        // --- UI Functions ---
+
+        const renderAdminPanel = () => {
+            const adminPanel = document.getElementById('admin-credit-panel');
+            if (isAdmin) {
+                adminPanel.classList.remove('hidden');
+            } else {
+                adminPanel.classList.add('hidden');
+            }
+        };
+        window.toggleAdmin = () => {
+            isAdmin = !isAdmin;
+            renderAdminPanel();
+            showMessage(`Admin tool visibility: ${isAdmin ? 'ON' : 'OFF'}.`, 'info');
+        };
+
+        const toggleMenu = () => {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const isOpen = sidebar.classList.contains('translate-x-0');
+
+            if (isOpen) {
+                sidebar.classList.remove('translate-x-0');
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                overlay.classList.remove('hidden');
+            }
+        };
+        window.toggleMenu = toggleMenu; 
+
+        const setViewMode = (mode) => {
+            viewMode = mode;
+            toggleMenu(); 
+            updateMainView();
+        };
+        window.setViewMode = setViewMode; 
+
+        const updateMainView = () => {
+            const titleEl = document.getElementById('main-content-title');
+            
+            document.getElementById('scrim-list-container').classList.add('hidden');
+            document.getElementById('about-section').classList.add('hidden');
+
+            const currentListEl = document.getElementById('scrim-list-container');
+            const aboutEl = document.getElementById('about-section');
+
+            switch (viewMode) {
+                case 'running':
+                    titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions';
+                    currentListEl.classList.remove('hidden');
+                    renderScrims(allScrims.filter(s => s.status === 'Open' || s.status === 'Full'));
+                    break;
+                case 'finished':
+                    titleEl.innerHTML = '<span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Matches';
+                    currentListEl.classList.remove('hidden');
+                    renderScrims(allScrims.filter(s => s.status === 'Finished'));
+                    break;
+                case 'about':
+                    titleEl.innerHTML = '<span data-lucide="Info" class="text-ff-accent"></span> Platform Info';
+                    aboutEl.classList.remove('hidden');
+                    break;
+            }
+            import('https://unpkg.com/lucide@latest/dist/esm/lucide.js')
+                .then(({ createIcons, Swords, ListChecks, Info }) => {
+                    createIcons({
+                        icons: { Swords, ListChecks, Info },
+                        attrs: { width: 24, height: 24, class: 'inline-block mr-2' },
+                        elements: titleEl.querySelectorAll('[data-lucide]')
+                    });
+                });
+        };
+
+        // --- Entry Fee Toggle Logic ---
+        const toggleEntryFee = (isFree) => {
+            const entryInput = document.getElementById('scrim-entry');
+            const entryLabel = document.getElementById('scrim-entry-label');
+            
+            if (isFree) {
+                entryInput.value = 0;
+                entryInput.disabled = true;
+                entryInput.classList.add('opacity-50', 'cursor-not-allowed');
+                entryLabel.innerHTML = 'Entry Fee (C) <span class="text-green-400 font-bold">(FREE)</span>';
+            } else {
+                entryInput.disabled = false;
+                entryInput.value = 100; 
+                entryInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                entryLabel.textContent = 'Entry Fee (C)';
+            }
+        };
+        window.toggleEntryFee = toggleEntryFee;
+
+
+        // --- Scrim and Wallet Data Management ---
+
+        const setupRealtimeListeners = () => {
+            if (!db || !userId) return;
+
+            // 1. Scrims Listener
+            const scrimsQuery = query(collection(db, SCRIM_COLLECTION));
+            onSnapshot(scrimsQuery, (snapshot) => {
+                allScrims = [];
+                snapshot.forEach(doc => {
+                    allScrims.push({ id: doc.id, ...doc.data() });
+                });
+                updateMainView(); 
+            }, (error) => console.error("Error listening to scrims:", error));
+
+            // 2. Wallet Listener
+            const walletDocRef = doc(db, USER_WALLET_PATH(userId));
+            onSnapshot(walletDocRef, (docSnap) => {
+                const balance = docSnap.exists() ? docSnap.data().balance : 0;
+                renderWallet(balance);
+            }, (error) => console.error("Error listening to wallet:", error));
+
+            initWallet();
+        };
+
+        const initWallet = async () => {
+            if (!db || !userId) return;
+            const walletDocRef = doc(db, USER_WALLET_PATH(userId));
+            try {
+                const docSnap = await getDoc(walletDocRef);
+                if (!docSnap.exists()) {
+                    // Initialize wallet to 0 for new users
+                    await setDoc(walletDocRef, { balance: 0, lastUpdated: serverTimestamp() });
+                }
+            } catch (e) {
+                console.error("Error initializing wallet:", e);
+            }
+        };
+
+        const updateWalletBalance = async (uid, amount) => {
+            if (!db) throw new Error("Database not initialized.");
+            const walletDocRef = doc(db, USER_WALLET_PATH(uid));
+            return runTransaction(db, async (transaction) => {
+                const docSnap = await transaction.get(walletDocRef);
+                const currentBalance = docSnap.exists() ? docSnap.data().balance : 0;
+                const newBalance = currentBalance + amount;
+
+                if (newBalance < 0) {
+                    throw new Error("Insufficient funds for this action.");
+                }
+
+                transaction.set(walletDocRef, { balance: newBalance, lastUpdated: serverTimestamp() }, { merge: true });
+                return newBalance;
+            });
+        };
+        
+        // --- ADMIN FUNCTION: Grant Credits ---
+        const addCreditsHandler = async (e) => {
+            e.preventDefault();
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
+
+            const targetId = document.getElementById('admin-target-id').value.trim();
+            const amount = parseInt(document.getElementById('admin-amount').value);
+
+            // Use crypto.randomUUID() as a fallback for the admin tool if target ID is blank
+            const effectiveTargetId = targetId || crypto.randomUUID();
+
+            if (amount <= 0 || isNaN(amount)) {
+                return showMessage("Amount must be a positive number.", "error");
+            }
+
+            try {
+                await updateWalletBalance(effectiveTargetId, amount);
+                document.getElementById('admin-credit-form').reset();
+                showMessage(`Successfully granted ${amount.toLocaleString()} C to OP ID: ${effectiveTargetId.substring(0, 8)}...`, "success");
+
+            } catch (error) {
+                showMessage(`Failed to grant credits: ${error.message}`, "error");
+            }
+        };
+        window.addCreditsHandler = addCreditsHandler; 
+
+
+        const createScrim = async (e) => {
+            e.preventDefault();
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
+
+            const title = document.getElementById('scrim-title').value;
+            const entryFee = parseInt(document.getElementById('scrim-entry').value);
+            const prize = parseInt(document.getElementById('scrim-prize').value);
+            const isPaid = entryFee > 0;
+
+            if (!title || prize < 100 || isNaN(prize)) {
+                return showMessage("Please enter a valid title and prize (min 100).", "error");
+            }
+            if (isPaid && entryFee < 10) {
+                 return showMessage("Paid scrims must have an entry fee of at least 10 credits.", "error");
+            }
+
+            try {
+                if (isPaid) {
+                    await updateWalletBalance(userId, -entryFee);
+                }
+
+                await addDoc(collection(db, SCRIM_COLLECTION), {
+                    creatorId: userId,
+                    title: title,
+                    entryFee: entryFee,
+                    prize: prize,
+                    status: 'Open',
+                    joiners: [{ id: userId, name: `User_${userId.substring(0, 4)}`, paid: true }],
+                    maxPlayers: 4, 
+                    createdAt: serverTimestamp()
+                });
+                document.getElementById('create-scrim-form').reset();
+                showMessage(`Scrim "${title}" launched! ${entryFee} credits paid.`, "success");
+                toggleEntryFee(false); 
+
+            } catch (error) {
+                if (error.message.includes("Insufficient funds")) {
+                    showMessage("Failed to launch: Insufficient credits for entry fee.", "error");
+                } else {
+                    showMessage(`Failed to launch scrim: ${error.message}`, "error");
+                }
+            }
+        };
+        window.createScrim = createScrim;
+
+        const joinScrim = async (scrim) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
+
+            const isJoined = scrim.joiners.some(j => j.id === userId);
+            if (isJoined) return showMessage("You have already joined this scrim.", "info");
+            if (scrim.joiners.length >= scrim.maxPlayers) return showMessage("This scrim is full.", "error");
+
+            try {
+                if (scrim.entryFee > 0) {
+                    await updateWalletBalance(userId, -scrim.entryFee);
+                }
+
+                const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
+                const newJoiner = { id: userId, name: `User_${userId.substring(0, 4)}`, paid: true };
+                const newJoiners = [...scrim.joiners, newJoiner];
+                const newStatus = newJoiners.length >= scrim.maxPlayers ? 'Full' : 'Open';
+
+                await updateDoc(scrimDocRef, { joiners: newJoiners, status: newStatus });
+
+                showMessage(`Joined scrim: "${scrim.title}". Good luck!`, "success");
+            } catch (error) {
+                if (error.message.includes("Insufficient funds")) {
+                    showMessage("Failed to join: Insufficient funds in your wallet.", "error");
+                } else {
+                    showMessage(`Failed to join scrim: ${error.message}`, "error");
+                }
+            }
+        };
+
+        const finishScrim = async (scrim) => {
+            if (scrim.creatorId !== userId) return; 
+            if (scrim.status === 'Finished') return showMessage("This scrim is already finished.", "info");
+
+            showConfirmationModal(`Award the ${scrim.prize} credit prize for "${scrim.title}" to yourself?`, async () => {
+                try {
+                    const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
+                    await updateDoc(scrimDocRef, { status: 'Finished' });
+                    await updateWalletBalance(userId, scrim.prize);
+                    showMessage(`Scrim "${scrim.title}" finished! Prize loaded into wallet.`, "success");
+
+                } catch (error) {
+                    showMessage(`Failed to finish scrim: ${error.message}`, "error");
+                }
+            });
+        };
+
+        const deleteScrim = async (scrimId) => {
+            if (!isAuthReady || !userId) return;
+
+            showConfirmationModal("Are you sure you want to DELETE this finished scrim?", async () => {
+                try {
+                    await deleteDoc(doc(db, SCRIM_COLLECTION, scrimId));
+                    showMessage("Scrim successfully deleted.", "success");
+                } catch (error) {
+                    showMessage(`Failed to delete scrim: ${error.message}`, "error");
+                }
+            });
+        };
+
+        // --- Wallet Modal Handlers ---
+
+        window.openWalletModal = () => {
+            if (!userId) return showMessage("Authentication not ready. Please wait.", "error");
+            document.getElementById('modal-current-balance').textContent = currentWalletBalance.toLocaleString() + ' C';
+            document.getElementById('wallet-modal').classList.remove('hidden');
+        };
+
+        window.closeWalletModal = () => {
+            document.getElementById('wallet-modal').classList.add('hidden');
+        };
+
+        const handleDeposit = async (e) => {
+            e.preventDefault();
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
+
+            const amount = parseInt(document.getElementById('deposit-amount').value);
+
+            if (amount <= 0 || isNaN(amount)) {
+                return showMessage("Deposit amount must be a positive number.", "error");
+            }
+            
+            showConfirmationModal(`Are you sure you want to deposit ${amount.toLocaleString()} C?`, async () => {
+                try {
+                    await updateWalletBalance(userId, amount);
+                    document.getElementById('deposit-form').reset();
+                    showMessage(`Successfully deposited ${amount.toLocaleString()} C.`, "success");
+                    closeWalletModal();
+                } catch (error) {
+                    showMessage(`Failed to deposit credits: ${error.message}`, "error");
+                }
+            });
+        };
+        window.handleDeposit = handleDeposit;
+
+
+        const handleWithdraw = async (e) => {
+            e.preventDefault();
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
+
+            const amount = parseInt(document.getElementById('withdraw-amount').value);
+
+            if (amount <= 0 || isNaN(amount)) {
+                return showMessage("Withdrawal amount must be a positive number.", "error");
+            }
+
+            showConfirmationModal(`Are you sure you want to withdraw ${amount.toLocaleString()} C?`, async () => {
+                try {
+                    await updateWalletBalance(userId, -amount); 
+                    document.getElementById('withdraw-form').reset();
+                    showMessage(`Successfully withdrew ${amount.toLocaleString()} C.`, "success");
+                    closeWalletModal();
+                } catch (error) {
+                    if (error.message.includes("Insufficient funds")) {
+                         showMessage("Withdrawal failed: You do not have enough credits.", "error");
+                    } else {
+                         showMessage(`Failed to withdraw credits: ${error.message}`, "error");
+                    }
+                }
+            });
+        };
+        window.handleWithdraw = handleWithdraw;
+
+
+        // --- UI Rendering Functions ---
+
+        const renderWallet = (balance) => {
+            currentWalletBalance = balance; 
+            const balanceEl = document.getElementById('wallet-balance');
+            balanceEl.textContent = balance.toLocaleString();
+            balanceEl.classList.toggle('text-red-400', balance < 100);
+            balanceEl.classList.toggle('text-green-400', balance >= 100);
+        };
+
+        const getStatusClasses = (status) => {
+            switch (status) {
+                case 'Open': return 'bg-green-500 text-black';
+                case 'Full': return 'bg-yellow-500 text-black';
+                case 'Finished': return 'bg-gray-600 text-white';
+                default: return 'bg-gray-400 text-black';
+            }
+        };
+
+        const renderScrims = (scrims) => {
+            const container = document.getElementById('scrim-list');
+            container.innerHTML = ''; 
+
+            if (scrims.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-500 p-8 border border-dashed border-gray-700 rounded-xl">
+                    ${viewMode === 'running' ? 'No active scrims available. Deploy a match to start competing!' : 'No matches have been finished yet.'}
+                </p>`;
+                return;
+            }
+
+            scrims.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+            scrims.forEach(scrim => {
+                const isCreator = scrim.creatorId === userId;
+                const isJoined = scrim.joiners.some(j => j.id === userId);
+                const isFull = scrim.joiners.length >= scrim.maxPlayers;
+
+                let actionButton = '';
+                const creatorDisplayId = `User_${scrim.creatorId.substring(0, 6)}`;
+                const creatorColor = isCreator ? 'text-green-400' : 'text-ff-accent';
+
+                if (scrim.status === 'Open' || scrim.status === 'Full') {
+                    if (isCreator) {
+                        actionButton = `<button onclick="window.finishScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg">
+                            Finish Match (Award Prize)
+                        </button>`;
+                    } else if (isJoined) {
+                        actionButton = `<span class="px-4 py-2 bg-gray-700 text-gray-400 font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
+                            <span data-lucide="CheckCircle" class="text-green-400 mr-1"></span> Joined
+                        </span>`;
+                    } else if (isFull) {
+                         actionButton = `<span class="px-4 py-2 bg-red-800 text-white font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
+                            <span data-lucide="XCircle" class="text-white mr-1"></span> Full
+                        </span>`;
+                    } else { 
+                        const feeDisplay = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
+                        const feeButtonClass = scrim.entryFee > 0 ? 'bg-ff-accent hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
+
+                        actionButton = `<button onclick="window.joinScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 ${feeButtonClass} text-white font-bold rounded-lg transition duration-200 shadow-lg">
+                            Join Scrim (${feeDisplay})
+                        </button>`;
+                    }
+                } else if (scrim.status === 'Finished' && isCreator) {
+                    actionButton = `<button onclick="window.deleteScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-gray-800 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-lg border border-red-700">
+                        <span data-lucide="XCircle" class="text-red-400 mr-1"></span> Delete Scrim
+                    </button>`;
+                } else if (scrim.status === 'Finished' && !isCreator) {
+                    actionButton = `<span class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full bg-gray-700 text-gray-400">Match Ended</span>`;
+                }
+
+                const scrimElement = document.createElement('div');
+                scrimElement.className = 'scrim-item bg-ff-card p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-l-4 border-ff-accent';
+                scrimElement.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex items-center mb-2">
+                            <span class="inline-block px-3 py-1 text-xs font-bold rounded-full ${getStatusClasses(scrim.status)} mr-3 uppercase shadow-md">${scrim.status}</span>
+                            <h3 class="text-xl font-extrabold text-white">${scrim.title}</h3>
+                        </div>
+                        <div class="text-sm text-gray-400 space-y-1">
+                            <p><strong>Creator:</strong> <span class="${creatorColor} font-mono">${creatorDisplayId}</span></p>
+                            <p><strong>Prize Pool:</strong> <span class="text-green-400 font-bold">${scrim.prize.toLocaleString()} C</span></p>
+                            <p><strong>Entry Fee:</strong> <span class="text-red-400 font-bold">${scrim.entryFee.toLocaleString()} C</span></p>
+                            <p><strong>Players:</strong> ${scrim.joiners.length} / ${scrim.maxPlayers}</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex-shrink-0">
+                        ${actionButton}
+                    </div>
+                `;
+                container.appendChild(scrimElement);
+                
+                createIcons({
+                    icons: { XCircle, CheckCircle },
+                    attrs: { width: 18, height: 18, class: 'inline-block' },
+                    elements: scrimElement.querySelectorAll('[data-lucide]')
+                });
+            });
+        };
+
+        // --- Utility Functions for Modal/Messaging ---
+        const showMessage = (text, type = 'info') => {
+            const box = document.getElementById('message-box');
+            box.textContent = text;
+            box.className = 'fixed top-4 right-4 p-4 rounded-lg z-50 transition-transform duration-300 transform shadow-2xl translate-x-0 opacity-100';
+
+            switch (type) {
+                case 'success': box.classList.add('bg-green-600', 'text-white'); break;
+                case 'error': box.classList.add('bg-ff-accent', 'text-white'); break;
+                default: box.classList.add('bg-blue-600', 'text-white');
+            }
+
+            setTimeout(() => {
+                box.classList.remove('translate-x-0', 'opacity-100');
+                box.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => box.classList.remove('bg-green-600', 'bg-ff-accent', 'bg-blue-600'), 500); 
+            }, 4000);
+        };
+
+        const showConfirmationModal = (message, onConfirm) => {
+            const modal = document.getElementById('confirmation-modal');
+            const messageEl = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+
+            messageEl.textContent = message;
+
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            newConfirmBtn.onclick = () => {
+                onConfirm();
+                modal.classList.add('hidden');
+            };
+            
+            document.getElementById('modal-cancel-btn').onclick = () => modal.classList.add('hidden');
+
+            modal.classList.remove('hidden');
+        };
+
+        // --- Export Wrappers ---
+        window.joinScrimWrapper = async (scrimId) => {
+            if (!db) return showMessage("Database not ready.", "error");
+            const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
+            if (scrimDocSnap.exists()) {
+                joinScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
+            } else {
+                showMessage("Scrim not found.", "error");
+            }
+        };
+
+        window.finishScrimWrapper = async (scrimId) => {
+            if (!db) return showMessage("Database not ready.", "error");
+            const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
+            if (scrimDocSnap.exists()) {
+                finishScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
+            } else {
+                showMessage("Scrim not found.", "error");
+            }
+        };
+
+        window.deleteScrimWrapper = (scrimId) => {
+            deleteScrim(scrimId);
+        };
+
+        // --- Startup ---
+        window.addEventListener('load', () => {
+             initFirebase();
+             toggleEntryFee(false);
+        });
+    </script>
+
+    <!-- Main App Content Container (Now visible on load) -->
+    <div id="main-app-content">
+
+        <!-- Sidebar Menu -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-40 hidden" onclick="toggleMenu()"></div>
+        <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-900 z-50 shadow-2xl transform -translate-x-full p-6 flex flex-col border-r-4 border-ff-accent">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-ff-accent uppercase">Menu</h2>
+                <button onclick="toggleMenu()" class="text-white hover:text-ff-accent p-2 rounded-full transition duration-150">
+                    <span data-lucide="X"></span>
+                </button>
+            </div>
+
+            <!-- Wallet Section - Clickable -->
+            <div class="p-4 bg-ff-card rounded-xl shadow-inner border border-gray-700 mb-6 cursor-pointer" onclick="openWalletModal()">
+                <p class="text-sm text-gray-400 flex items-center mb-1">
+                    <span data-lucide="Wallet" class="text-green-400 mr-2"></span> Current Balance
+                </p>
+                <span id="wallet-balance" class="text-3xl font-extrabold text-green-400 transition-colors duration-500">0</span>
+                <span class="ml-1 text-sm text-gray-400">CREDITS (C)</span>
+                <button class="text-xs text-ff-accent font-bold mt-2 block hover:underline">Manage Funds</button>
+            </div>
+
+            <!-- Menu Navigation -->
+            <nav class="flex-grow space-y-2">
+                <button onclick="setViewMode('running')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
+                    <span data-lucide="Swords" class="text-ff-accent"></span> Running Scrims
+                </button>
+                <button onclick="setViewMode('finished')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
+                    <span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Scrims
+                </button>
+                <button onclick="setViewMode('about')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
+                    <span data-lucide="Info" class="text-ff-accent"></span> About Platform
+                </button>
+            </nav>
+            
+            <!-- Status Footer -->
+            <div class="mt-auto pt-4 border-t border-gray-700">
+                <p class="text-xs text-gray-500" id="app-status">Status: Initializing...</p>
+                <p class="text-xs text-gray-500 break-all">OP ID (User ID): <span id="current-user-id" class="text-gray-300 font-mono text-xs">Loading...</span></p>
+            </div>
+        </div>
+
+
+        <!-- Header Section -->
+        <header class="mb-8 p-6 bg-ff-card rounded-xl shadow-2xl border-b-4 border-ff-accent flex justify-between items-center">
+            <h1 class="text-4xl sm:text-5xl font-black text-ff-accent uppercase">SCRIM COMMAND</h1>
+            <button onclick="toggleMenu()" class="p-3 rounded-full bg-gray-800 text-white hover:bg-ff-accent transition duration-200 shadow-lg transform hover:scale-105">
+                <span data-lucide="Menu"></span>
+            </button>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Control Panel Column -->
+            <div class="lg:col-span-1 space-y-8 h-fit">
+                
+                <!-- Scrim Creation Panel -->
+                <section class="form-panel bg-ff-card p-6 rounded-xl shadow-2xl border border-ff-accent">
+                    <h2 class="text-3xl font-bold mb-6 flex items-center text-white border-b border-ff-accent pb-2">
+                        <span data-lucide="PlusCircle" class="text-ff-accent"></span> Deploy Scrim
+                    </h2>
+                    <form id="create-scrim-form" onsubmit="window.createScrim(event)" class="space-y-4">
+                        <div>
+                            <label for="scrim-title" class="block text-sm font-medium text-gray-300">Match Title</label>
+                            <input type="text" id="scrim-title" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                        </div>
+                        
+                        <!-- Free/Paid Toggle -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Entry Type</label>
+                            <div class="flex space-x-4">
+                                <label class="inline-flex items-center text-white">
+                                    <input type="radio" name="entry-type" value="paid" checked onclick="toggleEntryFee(false)" class="form-radio text-ff-accent bg-gray-700 border-gray-600 focus:ring-ff-accent">
+                                    <span class="ml-2">Paid Scrim</span>
+                                </label>
+                                <label class="inline-flex items-center text-white">
+                                    <input type="radio" name="entry-type" value="free" onclick="toggleEntryFee(true)" class="form-radio text-ff-accent bg-gray-700 border-gray-600 focus:ring-ff-accent">
+                                    <span class="ml-2">Free Scrim</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="scrim-entry" id="scrim-entry-label" class="block text-sm font-medium text-gray-300">Entry Fee (C)</label>
+                            <input type="number" id="scrim-entry" required min="0" value="100" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                        </div>
+                        <div>
+                            <label for="scrim-prize" class="block text-sm font-medium text-gray-300">Winning Prize (C)</label>
+                            <input type="number" id="scrim-prize" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-ff-accent hover:bg-red-700 text-gray-900 font-extrabold py-3 rounded-xl transition duration-200 shadow-lg hover:shadow-xl uppercase text-lg transform hover:scale-[1.01]">
+                            <span data-lucide="Swords" class="text-gray-900"></span> Launch Match
+                        </button>
+                    </form>
+                </section>
+                
+                <!-- ADMIN CREDIT GRANT PANEL (Hidden by default) -->
+                <section id="admin-credit-panel" class="bg-admin-card p-6 rounded-xl shadow-2xl border border-admin hidden">
+                    <h2 class="text-3xl font-bold mb-6 flex items-center text-white border-b border-admin pb-2">
+                        <span data-lucide="Shield" class="text-admin"></span> Admin Credit Tool
+                    </h2>
+                    <p class="text-sm text-gray-300 mb-4">Transfer credits to any player's **OP ID**. (Use `window.toggleAdmin()` in console to hide/show this panel.)</p>
+                    <form id="admin-credit-form" onsubmit="window.addCreditsHandler(event)" class="space-y-4">
+                        <div>
+                            <label for="admin-target-id" class="block text-sm font-medium text-gray-300">Target OP ID (User ID)</label>
+                            <input type="text" id="admin-target-id" placeholder="Paste the full user ID here or leave blank for a random ID..." class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                        </div>
+                        <div>
+                            <label for="admin-amount" class="block text-sm font-medium text-gray-300">Credit Amount to Grant (C)</label>
+                            <input type="number" id="admin-amount" required min="1" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-extrabold py-3 rounded-xl transition duration-200 shadow-lg hover:shadow-xl uppercase text-lg transform hover:scale-[1.01]">
+                            <span data-lucide="Wallet" class="text-white"></span> Grant Credits
+                        </button>
+                    </form>
+                </section>
+            </div>
+
+
+            <!-- Dynamic Content Panel (Right/Bottom) -->
+            <section class="lg:col-span-2">
+                <h2 id="main-content-title" class="text-3xl font-bold mb-4 flex items-center text-white border-b border-ff-accent pb-2 uppercase">
+                    <span data-lucide="Swords" class="text-ff-accent"></span> Active Missions
+                </h2>
+                
+                <!-- Scrim List View -->
+                <div id="scrim-list-container" class="scrim-list-container">
+                    <div id="scrim-list" class="space-y-4">
+                        <div class="text-center p-8 text-gray-500">Awaiting data transmission...</div>
+                    </div>
+                </div>
+
+                <!-- About Section View -->
+                <div id="about-section" class="bg-ff-card p-6 rounded-xl shadow-xl space-y-4 hidden border border-gray-700">
+                    <h3 class="text-2xl font-bold text-ff-accent mb-3 flex items-center"><span data-lucide="Users" class="text-ff-accent"></span> Platform Overview</h3>
+                    <ul class="list-disc list-inside text-gray-400 space-y-2">
+                        <li>**Persistence:** Scrims and Wallets are saved across sessions using Firestore.</li>
+                        <li>**Economy:** New users start with **0 Credits (C)**. Use the **Admin Credit Tool** to fund accounts for testing.</li>
+                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer, which is needed for admin grants and transactions.</li>
+                        <li>**Cleanup:** Only the **Creator** can finish a match (to award the prize) and then delete the scrim from the Finished Matches tab.</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Custom Notification/Message Box (No alert) -->
+    <div id="message-box" class="fixed top-4 right-4 p-4 rounded-lg z-50 transition-transform duration-300 transform translate-x-full opacity-0 shadow-2xl" role="alert">
+        <!-- Message content here -->
+    </div>
+
+    <!-- Confirmation Modal (No window.confirm) -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-sm w-full border border-red-700">
+            <h3 class="text-2xl font-bold mb-4 text-red-500 uppercase">Warning: System Override</h3>
+            <p id="modal-message" class="text-gray-300 mb-6"></p>
+            <div class="flex justify-end space-x-4">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition duration-200">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 transition duration-200 uppercase">
+                    Proceed
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Wallet Management Modal (Unchanged) -->
+    <div id="wallet-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] hidden">
+        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-ff-accent">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                <h3 class="text-3xl font-black text-white uppercase flex items-center">
+                    <span data-lucide="Wallet" class="text-ff-accent mr-2"></span> Manage Wallet
+                </h3>
+                <button onclick="closeWalletModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
+                    <span data-lucide="XCircle" width="24" height="24"></span>
+                </button>
+            </div>
+
+            <p class="text-lg text-gray-300 mb-6">Current Balance: <span id="modal-current-balance" class="font-extrabold text-green-400">0 C</span></p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Deposit Panel -->
+                <div class="p-4 bg-gray-900 rounded-lg border border-green-500/50">
+                    <h4 class="text-xl font-bold text-green-400 mb-3">Deposit Credits (Simulated)</h4>
+                    <form id="deposit-form" onsubmit="window.handleDeposit(event)" class="space-y-3">
+                        <div>
+                            <label for="deposit-amount" class="block text-sm font-medium text-gray-400">Amount (C)</label>
+                            <input type="number" id="deposit-amount" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition duration-200 uppercase text-sm">
+                            Deposit
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Withdraw Panel -->
+                <div class="p-4 bg-gray-900 rounded-lg border border-red-500/50">
+                    <h4 class="text-xl font-bold text-red-400 mb-3">Withdraw Credits (Simulated)</h4>
+                    <form id="withdraw-form" onsubmit="window.handleWithdraw(event)" class="space-y-3">
+                        <div>
+                            <label for="withdraw-amount" class="block text-sm font-medium text-gray-400">Amount (C)</label>
+                            <input type="number" id="withdraw-amount" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition duration-200 uppercase text-sm">
+                            Withdraw
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <p class="text-xs text-gray-500 mt-6 pt-4 border-t border-gray-800">Note: Transactions here are simulated and affect your in-app credit balance only. Minimum transaction amount is 100 C.</p>
+        </div>
+    </div>
+</body>
+</html>
