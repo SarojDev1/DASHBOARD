@@ -74,10 +74,10 @@
     
     <!-- Load Lucide Icons from CDN and initialize on load -->
     <script type="module">
-        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
         document.addEventListener('DOMContentLoaded', () => {
             createIcons({
-                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users },
+                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye },
                 attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
             });
         });
@@ -90,7 +90,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, query, setDoc, addDoc, updateDoc, deleteDoc, runTransaction, getDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { createIcons, XCircle, CheckCircle } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+        import { createIcons, XCircle, CheckCircle, Key, Eye } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
 
         // Global Firebase variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -220,7 +220,7 @@
                 case 'finished':
                     titleEl.innerHTML = '<span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Matches';
                     currentListEl.classList.remove('hidden');
-                    renderScrims(allScrims.filter(s => s.status === 'Finished'));
+                    renderScrims(allScrims.filter(s => s.status === 'Finished' || s.status === 'AwaitingResults'));
                     break;
                 case 'about':
                     titleEl.innerHTML = '<span data-lucide="Info" class="text-ff-accent"></span> Platform Info';
@@ -323,6 +323,10 @@
             const title = document.getElementById('scrim-title').value;
             const entryFee = parseInt(document.getElementById('scrim-entry').value);
             const prize = parseInt(document.getElementById('scrim-prize').value);
+            // New fields from the form
+            const mapType = document.getElementById('scrim-map-type').value;
+            const maxTeams = parseInt(document.getElementById('scrim-max-teams').value);
+            
             const isPaid = entryFee > 0;
 
             if (!title || prize < 100 || isNaN(prize)) {
@@ -331,6 +335,9 @@
             if (isPaid && entryFee < 10) {
                  return showMessage("Paid scrims must have an entry fee of at least 10 credits.", "error");
             }
+
+            // Creator joins as the first team automatically
+            const creatorTeamName = `Creator_${userId.substring(0, 4)}`;
 
             try {
                 // 1. Deduct entry fee before creating the document
@@ -345,8 +352,11 @@
                     entryFee: entryFee,
                     prize: prize,
                     status: 'Open',
-                    joiners: [{ id: userId, name: `User_${userId.substring(0, 4)}`, paid: true }],
-                    maxPlayers: 4, 
+                    mapType: mapType, // New field
+                    maxTeams: maxTeams, // Updated field
+                    joiners: [{ id: userId, teamName: creatorTeamName, paid: true }],
+                    idPass: { id: '', pass: '' }, 
+                    results: null, 
                     createdAt: serverTimestamp()
                 });
                 document.getElementById('create-scrim-form').reset();
@@ -364,12 +374,47 @@
         };
         window.createScrim = createScrim;
 
-        const joinScrim = async (scrim) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
+        // Wrapper to open Join Scrim modal
+        window.openJoinScrimModal = (scrimId) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
+            
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (!scrim) return showMessage("Scrim not found.", "error");
 
             const isJoined = scrim.joiners.some(j => j.id === userId);
-            if (isJoined) return showMessage("You have already joined this scrim.", "info");
-            if (scrim.joiners.length >= scrim.maxPlayers) return showMessage("This scrim is full.", "error");
+            if (isJoined) return showMessage("You have already registered a team for this scrim.", "info");
+
+            // Check against maxTeams instead of maxPlayers
+            if (scrim.joiners.length >= scrim.maxTeams) return showMessage("This scrim is full.", "error");
+
+            document.getElementById('join-scrim-title').textContent = scrim.title;
+            document.getElementById('join-scrim-fee').textContent = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
+            
+            // Clear previous data and attach handler
+            document.getElementById('join-team-name').value = '';
+            const joinForm = document.getElementById('join-scrim-form');
+            joinForm.onsubmit = (e) => {
+                e.preventDefault();
+                const teamName = document.getElementById('join-team-name').value.trim();
+                if (!teamName) return showMessage("Team Name is required.", "error");
+                joinScrim(scrim, teamName);
+                closeJoinScrimModal();
+            };
+
+            document.getElementById('join-scrim-modal').classList.remove('hidden');
+        };
+
+        window.closeJoinScrimModal = () => {
+            document.getElementById('join-scrim-modal').classList.add('hidden');
+        };
+
+
+        const joinScrim = async (scrim, teamName) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
+
+            // Check for duplicate team name
+            const teamNameExists = scrim.joiners.some(j => j.teamName === teamName);
+            if (teamNameExists) return showMessage(`Team name "${teamName}" is already registered. Choose another.`, "error");
 
             try {
                 // 1. Deduct entry fee if required
@@ -379,13 +424,14 @@
 
                 // 2. Update the document to add the new joiner
                 const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
-                const newJoiner = { id: userId, name: `User_${userId.substring(0, 4)}`, paid: true };
+                const newJoiner = { id: userId, teamName: teamName, paid: true };
                 const newJoiners = [...scrim.joiners, newJoiner];
-                const newStatus = newJoiners.length >= scrim.maxPlayers ? 'Full' : 'Open';
+                // Check against maxTeams
+                const newStatus = newJoiners.length >= scrim.maxTeams ? 'Full' : 'Open';
 
                 await updateDoc(scrimDocRef, { joiners: newJoiners, status: newStatus });
 
-                showMessage(`Joined scrim: "${scrim.title}". Good luck!`, "success");
+                showMessage(`Joined scrim: "${scrim.title}" as Team ${teamName}. Good luck!`, "success");
             } catch (error) {
                 if (error.message.includes("Insufficient funds")) {
                     showMessage("Failed to join: Insufficient funds in your wallet.", "error");
@@ -395,24 +441,185 @@
             }
         };
 
-        const finishScrim = async (scrim) => {
-            if (scrim.creatorId !== userId) return; 
-            if (scrim.status === 'Finished') return showMessage("This scrim is already finished.", "info");
+        // --- ID/Pass Management ---
 
-            showConfirmationModal(`Award the ${scrim.prize} credit prize for "${scrim.title}" to yourself?`, async () => {
+        window.openIdPassModal = (scrimId) => {
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (!scrim) return showMessage("Scrim not found.", "error");
+
+            const isCreator = scrim.creatorId === userId;
+            const isJoined = scrim.joiners.some(j => j.id === userId);
+
+            if (isCreator) {
+                // Creator: Show upload/edit form
+                document.getElementById('id-pass-title').textContent = `Upload Credentials for ${scrim.title}`;
+                document.getElementById('id-pass-form').classList.remove('hidden');
+                document.getElementById('id-pass-display').classList.add('hidden');
+                
+                document.getElementById('scrim-room-id').value = scrim.idPass?.id || '';
+                document.getElementById('scrim-room-pass').value = scrim.idPass?.pass || '';
+
+                const idPassForm = document.getElementById('id-pass-form');
+                idPassForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    uploadIdPass(scrimId);
+                    closeIdPassModal();
+                };
+            } else if (isJoined && scrim.idPass?.id && scrim.idPass?.pass) {
+                // Joiner: Show display view
+                document.getElementById('id-pass-title').textContent = `Credentials for ${scrim.title}`;
+                document.getElementById('id-pass-form').classList.add('hidden');
+                document.getElementById('id-pass-display').classList.remove('hidden');
+
+                document.getElementById('display-room-id').textContent = scrim.idPass.id;
+                document.getElementById('display-room-pass').textContent = scrim.idPass.pass;
+            } else {
+                return showMessage("Credentials not yet available or you are not a registered player.", "info");
+            }
+
+            document.getElementById('id-pass-modal').classList.remove('hidden');
+        };
+
+        window.closeIdPassModal = () => {
+            document.getElementById('id-pass-modal').classList.add('hidden');
+        };
+
+        const uploadIdPass = async (scrimId) => {
+            if (!isAuthReady || !userId) return;
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (scrim.creatorId !== userId) return showMessage("Only the creator can upload credentials.", "error");
+
+            const id = document.getElementById('scrim-room-id').value.trim();
+            const pass = document.getElementById('scrim-room-pass').value.trim();
+
+            if (!id || !pass) return showMessage("Both Room ID and Password are required.", "error");
+
+            try {
+                const scrimDocRef = doc(db, SCRIM_COLLECTION, scrimId);
+                await updateDoc(scrimDocRef, { 
+                    idPass: { id, pass },
+                    // Status transition logic remains
+                    status: scrim.status === 'Open' && scrim.joiners.length === scrim.maxTeams ? 'Full' : scrim.status
+                });
+                showMessage("Room credentials uploaded successfully!", "success");
+            } catch (error) {
+                showMessage(`Failed to upload credentials: ${error.message}`, "error");
+            }
+        };
+
+
+        // --- Results and Prize Distribution ---
+
+        window.openResultsModal = (scrimId) => {
+            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (!scrim || scrim.creatorId !== userId) return showMessage("Only the creator can submit results.", "error");
+
+            if (scrim.joiners.length < 3) {
+                 return showMessage("At least 3 teams must be registered to determine 1st, 2nd, and 3rd place.", "info");
+            }
+            
+            const teamNames = scrim.joiners.map(j => j.teamName).sort();
+            const selectFields = ['#first-place-team', '#second-place-team', '#third-place-team'];
+
+            // Populate the dropdowns with unique team names
+            selectFields.forEach(selector => {
+                const selectEl = document.querySelector(selector);
+                selectEl.innerHTML = '<option value="" disabled selected>Select Team</option>';
+                teamNames.forEach(teamName => {
+                    const option = document.createElement('option');
+                    option.value = teamName;
+                    option.textContent = teamName;
+                    selectEl.appendChild(option);
+                });
+            });
+
+            // Set up form submission handler
+            const resultsForm = document.getElementById('results-form');
+            resultsForm.onsubmit = (e) => {
+                e.preventDefault();
+                submitResults(scrimId);
+                closeResultsModal();
+            };
+
+            document.getElementById('results-scrim-title').textContent = scrim.title;
+            document.getElementById('results-modal').classList.remove('hidden');
+        };
+
+        window.closeResultsModal = () => {
+            document.getElementById('results-modal').classList.add('hidden');
+        };
+
+        const submitResults = async (scrimId) => {
+            const first = document.getElementById('first-place-team').value;
+            const second = document.getElementById('second-place-team').value;
+            const third = document.getElementById('third-place-team').value;
+
+            if (!first || !second || !third) {
+                return showMessage("Please select a team for all 3 podium places.", "error");
+            }
+
+            const winners = [first, second, third];
+            if (new Set(winners).size !== 3) {
+                return showMessage("The 1st, 2nd, and 3rd place teams must be unique.", "error");
+            }
+
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (!scrim) return showMessage("Scrim not found.", "error");
+
+            showConfirmationModal(`Confirm results: 1st: ${first}, 2nd: ${second}, 3rd: ${third}. This will distribute ${scrim.prize.toLocaleString()} C.`, async () => {
                 try {
-                    const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
-                    // Update status first
-                    await updateDoc(scrimDocRef, { status: 'Finished' });
-                    // Award the prize
-                    await updateWalletBalance(userId, scrim.prize);
-                    showMessage(`Scrim "${scrim.title}" finished! Prize loaded into wallet.`, "success");
+                    // 1. Distribute Prizes
+                    await distributePrizes(scrim, { first, second, third });
 
+                    // 2. Update Scrim Status and Results
+                    const scrimDocRef = doc(db, SCRIM_COLLECTION, scrimId);
+                    await updateDoc(scrimDocRef, {
+                        status: 'Finished',
+                        results: { first, second, third, distributed: true }
+                    });
+
+                    showMessage(`Results submitted and ${scrim.prize.toLocaleString()} C distributed successfully!`, "success");
                 } catch (error) {
-                    showMessage(`Failed to finish scrim: ${error.message}`, "error");
+                    showMessage(`Prize distribution error: ${error.message}`, "error");
                 }
             });
         };
+
+        const distributePrizes = async (scrim, results) => {
+            const totalPrize = scrim.prize;
+            // 1st: 50%, 2nd: 30%, 3rd: 20%
+            const prizeDistribution = {
+                first: Math.floor(totalPrize * 0.50),
+                second: Math.floor(totalPrize * 0.30),
+                third: Math.floor(totalPrize * 0.20)
+            };
+
+            const updates = [];
+
+            // Helper to find the user ID associated with the winning team name
+            const getWinnerUserId = (teamName) => {
+                const winner = scrim.joiners.find(j => j.teamName === teamName);
+                if (!winner) throw new Error(`Could not find player ID for winning team: ${teamName}`);
+                return winner.id;
+            };
+
+            // Process 1st Place
+            const firstId = getWinnerUserId(results.first);
+            updates.push(updateWalletBalance(firstId, prizeDistribution.first));
+
+            // Process 2nd Place
+            const secondId = getWinnerUserId(results.second);
+            updates.push(updateWalletBalance(secondId, prizeDistribution.second));
+
+            // Process 3rd Place
+            const thirdId = getWinnerUserId(results.third);
+            updates.push(updateWalletBalance(thirdId, prizeDistribution.third));
+
+            // Execute all prize updates concurrently
+            await Promise.all(updates);
+        };
+        
 
         const deleteScrim = async (scrimId) => {
             if (!isAuthReady || !userId) return;
@@ -505,8 +712,8 @@
             switch (status) {
                 case 'Open': return 'bg-green-500 text-black';
                 case 'Full': return 'bg-yellow-500 text-black';
-                case 'Finished': return 'bg-gray-600 text-white';
-                default: return 'bg-gray-400 text-black';
+                case 'Finished': return 'bg-ff-accent text-white';
+                default: return 'bg-gray-600 text-white';
             }
         };
 
@@ -527,58 +734,108 @@
             scrims.forEach(scrim => {
                 const isCreator = scrim.creatorId === userId;
                 const isJoined = scrim.joiners.some(j => j.id === userId);
-                const isFull = scrim.joiners.length >= scrim.maxPlayers;
+                // Use maxTeams for the check
+                const isFull = scrim.joiners.length >= scrim.maxTeams; 
+                const hasIdPass = scrim.idPass?.id && scrim.idPass?.pass;
 
                 let actionButton = '';
-                // Display only a short version of the creator's ID for UI clarity
+                let secondaryActions = '';
+                
                 const creatorDisplayId = `User_${scrim.creatorId.substring(0, 6)}`;
                 const creatorColor = isCreator ? 'text-green-400' : 'text-ff-accent';
 
+                // --- Running Scrims (Open/Full) ---
                 if (scrim.status === 'Open' || scrim.status === 'Full') {
-                    if (isCreator) {
-                        actionButton = `<button onclick="window.finishScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg">
-                            Finish Match (Award Prize)
-                        </button>`;
-                    } else if (isJoined) {
-                        actionButton = `<span class="px-4 py-2 bg-gray-700 text-gray-400 font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
-                            <span data-lucide="CheckCircle" class="text-green-400 mr-1"></span> Joined
-                        </span>`;
-                    } else if (isFull) {
-                         actionButton = `<span class="px-4 py-2 bg-red-800 text-white font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
-                            <span data-lucide="XCircle" class="text-white mr-1"></span> Full
-                        </span>`;
-                    } else { 
-                        const feeDisplay = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
-                        const feeButtonClass = scrim.entryFee > 0 ? 'bg-ff-accent hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
 
-                        actionButton = `<button onclick="window.joinScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 ${feeButtonClass} text-white font-bold rounded-lg transition duration-200 shadow-lg">
-                            Join Scrim (${feeDisplay})
+                    // Creator-Specific Actions
+                    if (isCreator) {
+                        secondaryActions += `<button onclick="window.openIdPassModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                            <span data-lucide="Key" width="18" height="18" class="text-white mr-1"></span> Upload ID/Pass
+                        </button>`;
+                        actionButton = `<button onclick="window.openResultsModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg">
+                            Finish Match & Submit Results
+                        </button>`;
+                    } 
+                    
+                    // Joiner/Creator ID/Pass Viewing
+                    if (isJoined && hasIdPass) {
+                        secondaryActions += `<button onclick="window.openIdPassModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
+                            <span data-lucide="Eye" width="18" height="18" class="text-white mr-1"></span> View ID/Pass
                         </button>`;
                     }
-                } else if (scrim.status === 'Finished' && isCreator) {
-                    actionButton = `<button onclick="window.deleteScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-gray-800 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-lg border border-red-700">
-                        <span data-lucide="XCircle" class="text-red-400 mr-1"></span> Delete Scrim
-                    </button>`;
-                } else if (scrim.status === 'Finished' && !isCreator) {
-                    actionButton = `<span class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full bg-gray-700 text-gray-400">Match Ended</span>`;
+
+
+                    // General Join Actions
+                    if (!isCreator && !isJoined) {
+                        if (!isFull) {
+                            const feeDisplay = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
+                            const feeButtonClass = scrim.entryFee > 0 ? 'bg-ff-accent hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
+
+                            actionButton = `<button onclick="window.openJoinScrimModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 ${feeButtonClass} text-white font-bold rounded-lg transition duration-200 shadow-lg">
+                                Join Scrim (${feeDisplay})
+                            </button>`;
+                        } else {
+                            actionButton = `<span class="px-4 py-2 bg-red-800 text-white font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
+                                <span data-lucide="XCircle" width="18" height="18" class="text-white mr-1"></span> Full (Max ${scrim.maxTeams} Teams)
+                            </span>`;
+                        }
+                    } else if (!isCreator && isJoined) {
+                        // Already joined team
+                        const userTeamName = scrim.joiners.find(j => j.id === userId)?.teamName || 'N/A';
+                        actionButton = `<span class="px-4 py-2 bg-gray-700 text-gray-400 font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
+                            <span data-lucide="CheckCircle" width="18" height="18" class="text-green-400 mr-1"></span> Registered as ${userTeamName}
+                        </span>`;
+                    }
+                } 
+                
+                // --- Finished Scrims ---
+                else if (scrim.status === 'Finished') {
+                    if (isCreator) {
+                        secondaryActions += `<button onclick="window.deleteScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-gray-800 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-lg border border-red-700">
+                            <span data-lucide="XCircle" width="18" height="18" class="text-red-400 mr-1"></span> Delete Record
+                        </button>`;
+                    }
+                    if (scrim.results) {
+                        actionButton = `
+                            <div class="text-left mt-2 p-2 bg-gray-800 rounded-lg">
+                                <p class="text-xs font-bold text-yellow-400">1st: ${scrim.results.first}</p>
+                                <p class="text-xs font-bold text-gray-400">2nd: ${scrim.results.second}</p>
+                                <p class="text-xs font-bold text-red-400">3rd: ${scrim.results.third}</p>
+                            </div>
+                        `;
+                    } else {
+                        actionButton = `<span class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full bg-gray-700 text-gray-400">Results Pending</span>`;
+                    }
                 }
 
+
                 const scrimElement = document.createElement('div');
-                scrimElement.className = 'scrim-item bg-ff-card p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-l-4 border-ff-accent';
+                scrimElement.className = 'scrim-item bg-ff-card p-6 rounded-xl flex flex-col justify-between items-stretch mb-4 border-l-4 border-ff-accent';
                 scrimElement.innerHTML = `
                     <div class="flex-grow">
-                        <div class="flex items-center mb-2">
-                            <span class="inline-block px-3 py-1 text-xs font-bold rounded-full ${getStatusClasses(scrim.status)} mr-3 uppercase shadow-md">${scrim.status}</span>
-                            <h3 class="text-xl font-extrabold text-white">${scrim.title}</h3>
+                        <div class="flex items-start mb-3 justify-between">
+                            <div class="flex flex-col">
+                                <span class="inline-block px-3 py-1 text-xs font-bold rounded-full ${getStatusClasses(scrim.status)} mr-3 uppercase shadow-md mb-1">${scrim.status}</span>
+                                <h3 class="text-xl font-extrabold text-white">${scrim.title}</h3>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-lg font-extrabold text-green-400">${scrim.prize.toLocaleString()} C</p>
+                                <p class="text-xs text-gray-400">Prize Pool</p>
+                            </div>
                         </div>
-                        <div class="text-sm text-gray-400 space-y-1">
+                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-400 border-t border-b border-gray-700 py-3 mb-4">
                             <p><strong>Creator:</strong> <span class="${creatorColor} font-mono">${creatorDisplayId}</span></p>
-                            <p><strong>Prize Pool:</strong> <span class="text-green-400 font-bold">${scrim.prize.toLocaleString()} C</span></p>
                             <p><strong>Entry Fee:</strong> <span class="text-red-400 font-bold">${scrim.entryFee.toLocaleString()} C</span></p>
-                            <p><strong>Players:</strong> ${scrim.joiners.length} / ${scrim.maxPlayers}</p>
+                            <p><strong>Map/Mode:</strong> <span class="text-white font-bold">${scrim.mapType || 'N/A'}</span></p>
+                            <p><strong>Teams:</strong> ${scrim.joiners.length} / ${scrim.maxTeams} Teams</p>
+                            <p class="col-span-2"><strong>Team List:</strong> <span class="text-gray-300 text-xs">${scrim.joiners.map(j => j.teamName).join(', ')}</span></p>
                         </div>
                     </div>
-                    <div class="mt-4 md:mt-0 flex-shrink-0">
+                    
+                    <div class="flex flex-col sm:flex-row justify-end items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                        <div class="flex space-x-2 w-full sm:w-auto justify-end">
+                            ${secondaryActions}
+                        </div>
                         ${actionButton}
                     </div>
                 `;
@@ -586,7 +843,7 @@
                 
                 // Re-render Lucide icons for the new scrim element
                 createIcons({
-                    icons: { XCircle, CheckCircle },
+                    icons: { XCircle, CheckCircle, Key, Eye },
                     attrs: { width: 18, height: 18, class: 'inline-block' },
                     elements: scrimElement.querySelectorAll('[data-lucide]')
                 });
@@ -631,44 +888,6 @@
             document.getElementById('modal-cancel-btn').onclick = () => modal.classList.add('hidden');
 
             modal.classList.remove('hidden');
-        };
-
-        // --- Export Wrappers to ensure authentication readiness ---
-        window.joinScrimWrapper = async (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
-            if (!db) return showMessage("Database not ready.", "error");
-
-            try {
-                const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
-                if (scrimDocSnap.exists()) {
-                    joinScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
-                } else {
-                    showMessage("Scrim not found.", "error");
-                }
-            } catch(e) {
-                showMessage(`Error fetching scrim: ${e.message}`, "error");
-            }
-        };
-
-        window.finishScrimWrapper = async (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
-            if (!db) return showMessage("Database not ready.", "error");
-
-            try {
-                const scrimDocSnap = await getDoc(doc(db, SCRIM_COLLECTION, scrimId));
-                if (scrimDocSnap.exists()) {
-                    finishScrim({ id: scrimDocSnap.id, ...scrimDocSnap.data() });
-                } else {
-                    showMessage("Scrim not found.", "error");
-                }
-            } catch(e) {
-                showMessage(`Error fetching scrim: ${e.message}`, "error");
-            }
-        };
-
-        window.deleteScrimWrapper = (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
-            deleteScrim(scrimId);
         };
 
         // --- Startup ---
@@ -745,6 +964,26 @@
                             <input type="text" id="scrim-title" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
                         </div>
                         
+                        <!-- NEW: Map Type and Max Teams -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="scrim-map-type" class="block text-sm font-medium text-gray-300">Map Type</label>
+                                <select id="scrim-map-type" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-ff-accent focus:border-ff-accent">
+                                    <option value="FullMap">Full Map (BR)</option>
+                                    <option value="ClashSquad">Clash Squad (CS)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="scrim-max-teams" class="block text-sm font-medium text-gray-300">Max Teams (Slots)</label>
+                                <select id="scrim-max-teams" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-ff-accent focus:border-ff-accent">
+                                    <option value="4">4 Teams</option>
+                                    <option value="8" selected>8 Teams</option>
+                                    <option value="12">12 Teams</option>
+                                    <option value="16">16 Teams</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <!-- Free/Paid Toggle -->
                         <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Entry Type</label>
@@ -796,8 +1035,8 @@
                     <ul class="list-disc list-inside text-gray-400 space-y-2">
                         <li>**Persistence:** Scrims and Wallets are saved across sessions using Firestore.</li>
                         <li>**Economy:** New users start with **0 Credits (C)**. To start playing paid scrims, use the **Deposit Credits** tab in the Wallet Menu.</li>
-                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer, which is needed for transactions.</li>
-                        <li>**Cleanup:** Only the **Creator** can finish a match (to award the prize) and then delete the scrim from the Finished Matches tab.</li>
+                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer.</li>
+                        <li>**Match Flow:** The creator uploads **ID/Pass** (only visible to joined teams), runs the match, submits the **1st, 2nd, and 3rd place team names**, and the system automatically distributes the prize pool.</li>
                     </ul>
                 </div>
             </section>
@@ -870,6 +1109,121 @@
             </div>
             
             <p class="text-xs text-gray-500 mt-6 pt-4 border-t border-gray-800">Note: Transactions here are simulated and affect your in-app credit balance only. Minimum transaction amount is 100 C.</p>
+        </div>
+    </div>
+
+    <!-- Join Scrim Modal (Team Name Input) -->
+    <div id="join-scrim-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
+        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-sm w-full border-t-4 border-ff-accent">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                <h3 class="text-2xl font-black text-white uppercase">Register Team</h3>
+                <button onclick="closeJoinScrimModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
+                    <span data-lucide="XCircle" width="24" height="24"></span>
+                </button>
+            </div>
+            <h4 id="join-scrim-title" class="text-xl font-bold text-ff-accent mb-2"></h4>
+            <p class="text-gray-400 mb-4">Entry Fee: <span id="join-scrim-fee" class="font-bold text-red-400"></span></p>
+
+            <form id="join-scrim-form" class="space-y-4">
+                <div>
+                    <label for="join-team-name" class="block text-sm font-medium text-gray-300">Your Team Name</label>
+                    <input type="text" id="join-team-name" required minlength="3" maxlength="15" placeholder="e.g. Shadow Squad" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                    <p class="text-xs text-gray-500 mt-1">This name identifies your team for results and prizes.</p>
+                </div>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 rounded-lg transition duration-200 uppercase">
+                    Confirm Registration
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ID/Pass Modal (Upload/View) -->
+    <div id="id-pass-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
+        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-md w-full border-t-4 border-blue-600">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                <h3 id="id-pass-title" class="text-2xl font-black text-white uppercase flex items-center">
+                    <span data-lucide="Key" class="text-blue-500 mr-2"></span> Credentials
+                </h3>
+                <button onclick="closeIdPassModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
+                    <span data-lucide="XCircle" width="24" height="24"></span>
+                </button>
+            </div>
+            
+            <!-- Creator Upload Form -->
+            <form id="id-pass-form" class="space-y-4 hidden">
+                <div>
+                    <label for="scrim-room-id" class="block text-sm font-medium text-gray-300">Room ID</label>
+                    <input type="text" id="scrim-room-id" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                </div>
+                <div>
+                    <label for="scrim-room-pass" class="block text-sm font-medium text-gray-300">Password</label>
+                    <input type="text" id="scrim-room-pass" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-lg transition duration-200 uppercase">
+                    Save Credentials
+                </button>
+            </form>
+
+            <!-- Joiner Display View -->
+            <div id="id-pass-display" class="space-y-4 hidden">
+                <div class="p-4 bg-gray-900 rounded-lg border border-blue-500">
+                    <p class="text-sm text-gray-400">Room ID:</p>
+                    <p id="display-room-id" class="text-2xl font-extrabold text-blue-400"></p>
+                </div>
+                <div class="p-4 bg-gray-900 rounded-lg border border-blue-500">
+                    <p class="text-sm text-gray-400">Password:</p>
+                    <p id="display-room-pass" class="text-2xl font-extrabold text-blue-400"></p>
+                </div>
+                <p class="text-xs text-red-400 mt-4">Do not share these credentials with non-registered players.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Modal (Winner Selection) -->
+    <div id="results-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
+        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-yellow-500">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                <h3 class="text-2xl font-black text-white uppercase flex items-center">
+                    <span data-lucide="ListChecks" class="text-yellow-500 mr-2"></span> Submit Results
+                </h3>
+                <button onclick="closeResultsModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
+                    <span data-lucide="XCircle" width="24" height="24"></span>
+                </button>
+            </div>
+            
+            <h4 id="results-scrim-title" class="text-xl font-bold text-yellow-400 mb-4"></h4>
+            <p class="text-sm text-gray-400 mb-6">Select the winning teams for 1st, 2nd, and 3rd place. Prizes will be distributed automatically.</p>
+
+            <form id="results-form" class="space-y-4">
+                
+                <!-- 1st Place -->
+                <div>
+                    <label for="first-place-team" class="block text-sm font-extrabold text-yellow-500">1st Place (50% Prize)</label>
+                    <select id="first-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                
+                <!-- 2nd Place -->
+                <div>
+                    <label for="second-place-team" class="block text-sm font-extrabold text-gray-400">2nd Place (30% Prize)</label>
+                    <select id="second-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                
+                <!-- 3rd Place -->
+                <div>
+                    <label for="third-place-team" class="block text-sm font-extrabold text-red-400">3rd Place (20% Prize)</label>
+                    <select id="third-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg transition duration-200 uppercase">
+                    Distribute Prizes & Finish Scrim
+                </button>
+            </form>
         </div>
     </div>
 </body>
