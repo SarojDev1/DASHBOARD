@@ -78,10 +78,10 @@
     
     <!-- Load Lucide Icons from CDN and initialize on load -->
     <script type="module">
-        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye, Loader } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
         document.addEventListener('DOMContentLoaded', () => {
             createIcons({
-                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye },
+                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye, Loader },
                 attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
             });
         });
@@ -92,7 +92,7 @@
     <!-- Firebase Initialization and Utility Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, collection, query, setDoc, addDoc, updateDoc, deleteDoc, runTransaction, getDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { createIcons, XCircle, CheckCircle, Key, Eye } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
 
@@ -138,7 +138,7 @@
         const USER_WALLET_PATH = (uid) => `artifacts/${appId}/users/${uid}/wallet/balance`;
 
         setLogLevel('debug');
-
+        
         // --- Core Firebase Initialization and Authentication ---
         const initFirebase = async () => {
             try {
@@ -146,14 +146,10 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // Sign-in flow: use custom token if available, otherwise sign in anonymously
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Set up the state change listener AFTER the initial sign-in attempt
+                // Set persistence to browser session to maintain sign-in within the session
+                await setPersistence(auth, browserSessionPersistence);
+                
+                // Set up the state change listener BEFORE the initial sign-in attempt
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
@@ -164,13 +160,19 @@
                         isAuthReady = true; 
 
                         setupRealtimeListeners();
+                        
                     } else {
-                        userId = null;
-                        isAuthReady = false; 
-                        document.getElementById('app-status').textContent = "Status: Offline (Sign-in failed)";
-                        document.getElementById('main-app-content').classList.add('opacity-0', 'pointer-events-none');
+                        // Attempt sign-in if no user is found initially
+                        performSignIn();
                     }
                 });
+
+                // If onAuthStateChanged finds a user, the listener handles it. If not, 
+                // and the page is being loaded for the first time, we perform the sign-in.
+                if (!auth.currentUser) {
+                    await performSignIn();
+                }
+
 
             } catch (error) {
                 // Display the error message clearly in the UI
@@ -178,6 +180,20 @@
                 console.error("Firebase Initialization Failure:", error);
             }
         };
+        
+        const performSignIn = async () => {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                document.getElementById('app-status').textContent = `Sign-in Error: ${error.message}`;
+                console.error("Sign-in Failure:", error);
+            }
+        };
+
 
         // --- UI Functions ---
 
@@ -214,10 +230,6 @@
             const currentListEl = document.getElementById('scrim-list-container');
             const aboutEl = document.getElementById('about-section');
             
-            // Ensure the main content is visible once we start rendering the view
-            document.getElementById('main-app-content').classList.remove('opacity-0', 'pointer-events-none');
-
-
             switch (viewMode) {
                 case 'running':
                     titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)';
@@ -918,8 +930,8 @@
         });
     </script>
 
-    <!-- Main App Content Container -->
-    <div id="main-app-content" class="opacity-0 pointer-events-none">
+    <!-- Main App Content Container (Visible immediately) -->
+    <div id="main-app-content">
 
         <!-- Sidebar Menu -->
         <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-40 hidden" onclick="toggleMenu()"></div>
