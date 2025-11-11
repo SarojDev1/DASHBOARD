@@ -246,7 +246,7 @@
             aboutEl.classList.add('hidden');
             loadingEl.classList.add('hidden');
 
-            // Show loading if auth is ready but data hasn't arrived yet
+            // --- CRITICAL CHECK: Show loading if data hasn't arrived yet ---
             if (isAuthReady && !isDataLoaded) {
                 titleEl.innerHTML = '<span data-lucide="Loader" class="text-white mr-2 animate-spin"></span> Fetching Scrim Data...';
                 loadingEl.classList.remove('hidden');
