@@ -161,6 +161,11 @@
 
                         setupRealtimeListeners();
                         
+                        // FIX: Explicitly call updateMainView after auth/listeners are set up
+                        // This resolves the issue where the view might be empty on refresh
+                        // if the first onSnapshot is slightly delayed.
+                        updateMainView(); 
+                        
                     } else {
                         // Attempt sign-in if no user is found initially
                         performSignIn();
@@ -300,6 +305,7 @@
                 console.log("==================================================");
 
                 // This call ensures the view is updated only when data is fully loaded
+                // This handles the automatic appearance of newly created scrims.
                 updateMainView(); 
             }, (error) => console.error("Error listening to scrims:", error));
 
@@ -390,8 +396,8 @@
                     createdAt: serverTimestamp()
                 });
                 document.getElementById('create-scrim-form').reset();
-                // CONFIRMATION: Show success message with ID and let the user know the list will update via listener.
-                showMessage(`Scrim "${title}" launched! ID: ${docRef.id.substring(0, 6)}... ${entryFee} credits paid. The list will update instantly.`, "success"); 
+                // CONFIRMATION: Show success message. The onSnapshot listener will handle the UI update.
+                showMessage(`Scrim "${title}" launched! ID: ${docRef.id.substring(0, 6)}... ${entryFee} credits paid. The list will update instantly via real-time sync.`, "success"); 
                 toggleEntryFee(false); 
 
             } catch (error) {
