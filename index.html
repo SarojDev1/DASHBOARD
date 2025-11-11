@@ -155,18 +155,16 @@
                         userId = user.uid;
                         document.getElementById('current-user-id').textContent = userId;
                         document.getElementById('app-status').textContent = "Status: Online (Authenticated)";
-                        document.getElementById('main-app-content').classList.remove('opacity-0', 'pointer-events-none');
                         
                         // Set readiness flag to TRUE only after user ID is confirmed
                         isAuthReady = true; 
 
                         setupRealtimeListeners();
-                        // REMOVED: updateMainView() call here. It will now be called 
-                        // exclusively by the onSnapshot listener once data is loaded.
                     } else {
                         userId = null;
                         isAuthReady = false; 
                         document.getElementById('app-status').textContent = "Status: Offline (Sign-in failed)";
+                        document.getElementById('main-app-content').classList.add('opacity-0', 'pointer-events-none');
                     }
                 });
 
@@ -211,16 +209,22 @@
 
             const currentListEl = document.getElementById('scrim-list-container');
             const aboutEl = document.getElementById('about-section');
+            
+            // Ensure the main content is visible once we start rendering the view
+            document.getElementById('main-app-content').classList.remove('opacity-0', 'pointer-events-none');
+
 
             switch (viewMode) {
                 case 'running':
-                    titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions';
+                    titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)';
                     currentListEl.classList.remove('hidden');
+                    // CRITICAL FILTER: Only show scrims that are 'Open' or 'Full'
                     renderScrims(allScrims.filter(s => s.status === 'Open' || s.status === 'Full'));
                     break;
                 case 'finished':
                     titleEl.innerHTML = '<span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Matches';
                     currentListEl.classList.remove('hidden');
+                    // FILTER: Show scrims that are 'Finished'
                     renderScrims(allScrims.filter(s => s.status === 'Finished' || s.status === 'AwaitingResults'));
                     break;
                 case 'about':
@@ -271,6 +275,14 @@
                 snapshot.forEach(doc => {
                     allScrims.push({ id: doc.id, ...doc.data() });
                 });
+                
+                const activeScrimsCount = allScrims.filter(s => s.status === 'Open' || s.status === 'Full').length;
+                console.log("==================================================");
+                console.log("FIRESTORE UPDATE RECEIVED (onSnapshot):");
+                console.log(`- Total Scrims in Database: ${allScrims.length}`);
+                console.log(`- Scrims visible in 'Active Missions' View: ${activeScrimsCount}`);
+                console.log("==================================================");
+
                 // This call ensures the view is updated only when data is fully loaded
                 updateMainView(); 
             }, (error) => console.error("Error listening to scrims:", error));
@@ -348,12 +360,12 @@
                 }
 
                 // 2. Create the Scrim Document
-                await addDoc(collection(db, SCRIM_COLLECTION), {
+                const docRef = await addDoc(collection(db, SCRIM_COLLECTION), {
                     creatorId: userId,
                     title: title,
                     entryFee: entryFee,
                     prize: prize,
-                    status: 'Open',
+                    status: 'Open', // <-- Starts as 'Open'
                     mapType: mapType, // New field
                     maxTeams: maxTeams, // Updated field
                     joiners: [{ id: userId, teamName: creatorTeamName, paid: true }],
@@ -362,7 +374,8 @@
                     createdAt: serverTimestamp()
                 });
                 document.getElementById('create-scrim-form').reset();
-                showMessage(`Scrim "${title}" launched! ${entryFee} credits paid.`, "success");
+                // CONFIRMATION: Show success message with ID and let the user know the list will update via listener.
+                showMessage(`Scrim "${title}" launched! ID: ${docRef.id.substring(0, 6)}... ${entryFee} credits paid. The list will update instantly.`, "success"); 
                 toggleEntryFee(false); 
 
             } catch (error) {
@@ -577,7 +590,7 @@
                     // 2. Update Scrim Status and Results
                     const scrimDocRef = doc(db, SCRIM_COLLECTION, scrimId);
                     await updateDoc(scrimDocRef, {
-                        status: 'Finished',
+                        status: 'Finished', // <-- Status changes to Finished here
                         results: { first, second, third, distributed: true }
                     });
 
@@ -902,7 +915,7 @@
     </script>
 
     <!-- Main App Content Container -->
-    <div id="main-app-content">
+    <div id="main-app-content" class="opacity-0 pointer-events-none">
 
         <!-- Sidebar Menu -->
         <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-40 hidden" onclick="toggleMenu()"></div>
@@ -1023,7 +1036,7 @@
             <!-- Dynamic Content Panel (Right/Bottom) -->
             <section class="lg:col-span-2">
                 <h2 id="main-content-title" class="text-3xl font-bold mb-4 flex items-center text-white border-b border-ff-accent pb-2 uppercase">
-                    <span data-lucide="Swords" class="text-ff-accent"></span> Active Missions
+                    <span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)
                 </h2>
                 
                 <!-- Scrim List View -->
