@@ -161,7 +161,8 @@
                         isAuthReady = true; 
 
                         setupRealtimeListeners();
-                        updateMainView(); 
+                        // REMOVED: updateMainView() call here. It will now be called 
+                        // exclusively by the onSnapshot listener once data is loaded.
                     } else {
                         userId = null;
                         isAuthReady = false; 
@@ -270,6 +271,7 @@
                 snapshot.forEach(doc => {
                     allScrims.push({ id: doc.id, ...doc.data() });
                 });
+                // This call ensures the view is updated only when data is fully loaded
                 updateMainView(); 
             }, (error) => console.error("Error listening to scrims:", error));
 
@@ -620,14 +622,16 @@
             await Promise.all(updates);
         };
         
-
-        const deleteScrim = async (scrimId) => {
+        // Wrapper for delete scrim action (ensures confirmation)
+        window.deleteScrimWrapper = (scrimId) => {
             if (!isAuthReady || !userId) return;
-
-            showConfirmationModal("Are you sure you want to DELETE this finished scrim?", async () => {
+            const scrim = allScrims.find(s => s.id === scrimId);
+            if (!scrim || scrim.creatorId !== userId) return showMessage("Only the creator can delete finished scrims.", "error");
+            
+            showConfirmationModal("Are you sure you want to DELETE this finished scrim? This action is permanent and removes the match record for all users.", async () => {
                 try {
                     await deleteDoc(doc(db, SCRIM_COLLECTION, scrimId));
-                    showMessage("Scrim successfully deleted.", "success");
+                    showMessage("Scrim successfully deleted. Match record removed.", "success");
                 } catch (error) {
                     showMessage(`Failed to delete scrim: ${error.message}`, "error");
                 }
