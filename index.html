@@ -74,6 +74,20 @@
             background-color: #1a1a2e;
             border-color: #ff3300;
         }
+
+        /* Spinner for Loading State */
+        .spinner {
+            border: 4px solid #3d3d57;
+            border-top: 4px solid #ff3300;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     
     <!-- Load Lucide Icons from CDN and initialize on load -->
@@ -129,6 +143,8 @@
 
         let db, auth, userId = null;
         let isAuthReady = false;
+        // NEW STATE: Flag to confirm initial data load from Firestore
+        let isDataLoaded = false; 
         let allScrims = []; 
         let viewMode = 'running'; 
         let currentWalletBalance = 0; 
@@ -161,11 +177,6 @@
 
                         setupRealtimeListeners();
                         
-                        // FIX: Explicitly call updateMainView after auth/listeners are set up
-                        // This resolves the issue where the view might be empty on refresh
-                        // if the first onSnapshot is slightly delayed.
-                        updateMainView(); 
-                        
                     } else {
                         // Attempt sign-in if no user is found initially
                         performSignIn();
@@ -177,7 +188,6 @@
                 if (!auth.currentUser) {
                     await performSignIn();
                 }
-
 
             } catch (error) {
                 // Display the error message clearly in the UI
@@ -228,23 +238,32 @@
 
         const updateMainView = () => {
             const titleEl = document.getElementById('main-content-title');
-            
-            document.getElementById('scrim-list-container').classList.add('hidden');
-            document.getElementById('about-section').classList.add('hidden');
-
-            const currentListEl = document.getElementById('scrim-list-container');
+            const listContainerEl = document.getElementById('scrim-list-container');
             const aboutEl = document.getElementById('about-section');
-            
+            const loadingEl = document.getElementById('loading-indicator');
+
+            listContainerEl.classList.add('hidden');
+            aboutEl.classList.add('hidden');
+            loadingEl.classList.add('hidden');
+
+            // Show loading if auth is ready but data hasn't arrived yet
+            if (isAuthReady && !isDataLoaded) {
+                titleEl.innerHTML = '<span data-lucide="Loader" class="text-white mr-2 animate-spin"></span> Fetching Scrim Data...';
+                loadingEl.classList.remove('hidden');
+                return;
+            }
+
+            // If data is loaded or we are in 'about' mode, proceed with rendering
             switch (viewMode) {
                 case 'running':
                     titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)';
-                    currentListEl.classList.remove('hidden');
+                    listContainerEl.classList.remove('hidden');
                     // CRITICAL FILTER: Only show scrims that are 'Open' or 'Full'
                     renderScrims(allScrims.filter(s => s.status === 'Open' || s.status === 'Full'));
                     break;
                 case 'finished':
                     titleEl.innerHTML = '<span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Matches';
-                    currentListEl.classList.remove('hidden');
+                    listContainerEl.classList.remove('hidden');
                     // FILTER: Show scrims that are 'Finished'
                     renderScrims(allScrims.filter(s => s.status === 'Finished' || s.status === 'AwaitingResults'));
                     break;
@@ -255,9 +274,9 @@
             }
             // Re-render Lucide icons for the title element after innerHTML change
             import('https://unpkg.com/lucide@latest/dist/esm/lucide.js')
-                .then(({ createIcons, Swords, ListChecks, Info }) => {
+                .then(({ createIcons, Swords, ListChecks, Info, Loader }) => {
                     createIcons({
-                        icons: { Swords, ListChecks, Info },
+                        icons: { Swords, ListChecks, Info, Loader },
                         attrs: { width: 24, height: 24, class: 'inline-block mr-2' },
                         elements: titleEl.querySelectorAll('[data-lucide]')
                     });
@@ -297,6 +316,8 @@
                     allScrims.push({ id: doc.id, ...doc.data() });
                 });
                 
+                isDataLoaded = true; // Set flag to true after the first data retrieval
+                
                 const activeScrimsCount = allScrims.filter(s => s.status === 'Open' || s.status === 'Full').length;
                 console.log("==================================================");
                 console.log("FIRESTORE UPDATE RECEIVED (onSnapshot):");
@@ -305,7 +326,6 @@
                 console.log("==================================================");
 
                 // This call ensures the view is updated only when data is fully loaded
-                // This handles the automatic appearance of newly created scrims.
                 updateMainView(); 
             }, (error) => console.error("Error listening to scrims:", error));
 
@@ -1061,10 +1081,16 @@
                     <span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)
                 </h2>
                 
+                <!-- Loading Indicator (New) -->
+                <div id="loading-indicator" class="bg-ff-card p-12 rounded-xl shadow-xl space-y-4 flex flex-col items-center justify-center border border-gray-700 hidden">
+                    <div class="spinner"></div>
+                    <p class="text-lg text-gray-400 mt-4">Loading real-time data from server...</p>
+                </div>
+                
                 <!-- Scrim List View -->
                 <div id="scrim-list-container" class="scrim-list-container">
                     <div id="scrim-list" class="space-y-4">
-                        <div class="text-center p-8 text-gray-500">Awaiting data transmission...</div>
+                        <!-- Scrims will be rendered here -->
                     </div>
                 </div>
 
