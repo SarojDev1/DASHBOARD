@@ -9,9 +9,13 @@
     
     <!-- Custom Styling and Fonts -->
     <style>
-        /* Custom Gaming Theme Colors and Font */
+        /* FIX FOR GITHUB PAGES / HOSTING: Apply base dark theme immediately to prevent white flash */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue:wght@400;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #0d0d1a; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #0d0d1a; /* Base dark background */
+            color: #e5e7eb; /* Base text-gray-100 color */
+        }
         h1, h2, #sidebar h2 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
 
         /* Custom Free Fire Accent (High-Energy Red/Orange) */
@@ -83,7 +87,7 @@
         });
     </script>
 </head>
-<body class="text-gray-100 min-h-screen p-4 sm:p-8">
+<body class="min-h-screen p-4 sm:p-8">
 
     <!-- Firebase Initialization and Utility Script -->
     <script type="module">
