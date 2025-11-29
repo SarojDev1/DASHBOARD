@@ -3,40 +3,26 @@
 <head>
     <title>SAROJ PRODUCTION PANEL</title>
     <style>
-        body {
-            font-family: Arial;
-            background: #0d0d0d;
-            color: white;
-            text-align: center;
-        }
+        body { font-family: Arial; background: #0d0d0d; color: white; text-align: center; }
         #loginBox, #callBox { margin-top: 40px; }
-        input {
-            padding: 10px;
-            width: 260px;
-            margin: 6px;
-            border-radius: 6px;
-            border: none;
-        }
-        button {
-            padding: 10px 20px;
-            border: none;
-            background: #7b2cff;
+        input { padding: 10px; width: 260px; margin: 6px; border-radius: 6px; border: none; }
+        button { padding: 10px 20px; border: none; background: #7b2cff; color: white; border-radius: 6px; cursor: pointer; }
+        video { width: 45%; margin: 10px; background: black; border-radius: 6px; position: relative; }
+        #controls button { margin: 5px; }
+        .muteOverlay {
+            position: absolute;
+            top: 5px; left: 5px;
+            background: red;
             color: white;
-            border-radius: 6px;
-            cursor: pointer;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: none;
+            z-index: 10;
         }
-        video {
-            width: 45%;
-            margin: 10px;
-            background: black;
-            border-radius: 6px;
-        }
-        #controls button {
-            margin: 5px;
-        }
+        .videoContainer { display: inline-block; position: relative; }
     </style>
 </head>
-
 <body>
 
 <h1>SAROJ PRODUCTION PANEL</h1>
@@ -54,8 +40,14 @@
 <div id="callBox" style="display:none;">
     <h2>Connected to: production-room</h2>
 
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <div class="videoContainer">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div id="muteOverlay" class="muteOverlay">MUTED</div>
+    </div>
+
+    <div class="videoContainer">
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
 
     <div id="controls">
         <button onclick="toggleMic()">Mute / Unmute</button>
@@ -81,7 +73,6 @@ const firebaseConfig = {
   appId: "1:536592740939:web:a59d16003542ee3b7b53ce",
   measurementId: "G-7HJWD72M12"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -103,10 +94,8 @@ function login() {
     let pass = document.getElementById("password").value;
 
     if (user === "admin" && pass === "12345") {
-        // admin login
         startCall();
     } else if (user !== "" && pass === "") {
-        // team login
         startCall();
     } else {
         alert("Wrong login details!");
@@ -122,37 +111,28 @@ function login() {
 //////////////////////////////////////////////////////////////
 async function startCall() {
     localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
         audio: true
     });
 
     document.getElementById("localVideo").srcObject = localStream;
 
     pc = new RTCPeerConnection({
-        iceServers: [
-            { urls: ["stun:stun.l.google.com:19302"] }
-        ]
+        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
     });
 
     remoteStream = new MediaStream();
     document.getElementById("remoteVideo").srcObject = remoteStream;
 
-    localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
-    });
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
     pc.ontrack = event => {
-        event.streams[0].getTracks().forEach(track => {
-            remoteStream.addTrack(track);
-        });
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
     };
 
     pc.onicecandidate = event => {
         if (event.candidate) {
-            db.collection(roomName)
-                .doc("candidates")
-                .collection("all")
-                .add(event.candidate.toJSON());
+            db.collection(roomName).doc("candidates").collection("all").add(event.candidate.toJSON());
         }
     };
 
@@ -160,37 +140,27 @@ async function startCall() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    await db.collection(roomName)
-        .doc("offer")
-        .set({
-            type: "offer",
-            sdp: offer.sdp
-        });
+    await db.collection(roomName).doc("offer").set({ type: "offer", sdp: offer.sdp });
 
     // Wait for answer
-    db.collection(roomName)
-        .doc("answer")
-        .onSnapshot(async snapshot => {
-            if (snapshot.exists) {
-                let answer = snapshot.data();
-                if (!pc.currentRemoteDescription) {
-                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                }
+    db.collection(roomName).doc("answer").onSnapshot(async snapshot => {
+        if (snapshot.exists) {
+            let answer = snapshot.data();
+            if (!pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
             }
-        });
+        }
+    });
 
     // ICE candidates
-    db.collection(roomName)
-        .doc("candidates")
-        .collection("all")
-        .onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(change => {
-                if (change.type === "added") {
-                    let data = change.doc.data();
-                    pc.addIceCandidate(new RTCIceCandidate(data));
-                }
-            });
+    db.collection(roomName).doc("candidates").collection("all").onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === "added") {
+                let data = change.doc.data();
+                pc.addIceCandidate(new RTCIceCandidate(data));
+            }
         });
+    });
 }
 
 //////////////////////////////////////////////////////////////
@@ -199,6 +169,7 @@ async function startCall() {
 function toggleMic() {
     micEnabled = !micEnabled;
     localStream.getAudioTracks()[0].enabled = micEnabled;
+    document.getElementById("muteOverlay").style.display = micEnabled ? "none" : "block";
 }
 
 function toggleCam() {
@@ -207,18 +178,20 @@ function toggleCam() {
 }
 
 async function startScreen() {
-    const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true
-    });
+    try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
+        });
+        const screenTrack = screenStream.getTracks()[0];
+        const sender = pc.getSenders().find(s => s.track.kind === "video");
+        sender.replaceTrack(screenTrack);
 
-    const screenTrack = screenStream.getTracks()[0];
-
-    const sender = pc.getSenders().find(s => s.track.kind === "video");
-    sender.replaceTrack(screenTrack);
-
-    screenTrack.onended = () => {
-        sender.replaceTrack(localStream.getVideoTracks()[0]);
-    };
+        screenTrack.onended = () => {
+            sender.replaceTrack(localStream.getVideoTracks()[0]);
+        };
+    } catch(err) {
+        alert("Screen share failed: " + err);
+    }
 }
 </script>
 </body>
