@@ -7,8 +7,8 @@
         #loginBox, #callBox { margin-top: 40px; }
         input { padding: 10px; width: 260px; margin: 6px; border-radius: 6px; border: none; }
         button { padding: 10px 20px; border: none; background: #7b2cff; color: white; border-radius: 6px; cursor: pointer; }
-        video { width: 45%; margin: 10px; background: black; border-radius: 6px; position: relative; }
-        #controls button { margin: 5px; }
+        .videoContainer { display: inline-block; position: relative; margin:10px; }
+        video { width: 45%; border-radius: 6px; background: black; }
         .muteOverlay {
             position: absolute;
             top: 5px; left: 5px;
@@ -20,7 +20,7 @@
             display: none;
             z-index: 10;
         }
-        .videoContainer { display: inline-block; position: relative; }
+        #controls button { margin: 5px; }
     </style>
 </head>
 <body>
@@ -28,7 +28,7 @@
 <h1>SAROJ PRODUCTION PANEL</h1>
 <h3>Admin + Teams | Video Call | Screen Share | Mute | Camera</h3>
 
-<!-- LOGIN PANEL -->
+<!-- LOGIN -->
 <div id="loginBox">
     <h2>Login</h2>
     <input id="username" placeholder="Enter username"><br>
@@ -36,7 +36,7 @@
     <button onclick="login()">Login</button>
 </div>
 
-<!-- CALL PANEL -->
+<!-- CALL -->
 <div id="callBox" style="display:none;">
     <h2>Connected to: production-room</h2>
 
@@ -56,14 +56,14 @@
     </div>
 </div>
 
-<!-- FIREBASE LIBRARIES -->
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
 <script>
-//////////////////////////////////////////////////////////////
-// 🔥 FIREBASE CONFIG (YOUR CONFIG)
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
+// FIREBASE CONFIG
+//////////////////////////////////
 const firebaseConfig = {
   apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
   authDomain: "business-bfddf.firebaseapp.com",
@@ -76,9 +76,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 // GLOBAL VARIABLES
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 const roomName = "production-room";
 let pc;
 let localStream;
@@ -86,9 +86,9 @@ let remoteStream;
 let micEnabled = true;
 let camEnabled = true;
 
-//////////////////////////////////////////////////////////////
-// LOGIN SYSTEM
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
+// LOGIN
+//////////////////////////////////
 function login() {
     let user = document.getElementById("username").value;
     let pass = document.getElementById("password").value;
@@ -98,7 +98,7 @@ function login() {
     } else if (user !== "" && pass === "") {
         startCall();
     } else {
-        alert("Wrong login details!");
+        alert("Wrong login!");
         return;
     }
 
@@ -106,20 +106,17 @@ function login() {
     document.getElementById("callBox").style.display = "block";
 }
 
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 // START VIDEO CALL
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 async function startCall() {
     localStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
         audio: true
     });
-
     document.getElementById("localVideo").srcObject = localStream;
 
-    pc = new RTCPeerConnection({
-        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
-    });
+    pc = new RTCPeerConnection({ iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }] });
 
     remoteStream = new MediaStream();
     document.getElementById("remoteVideo").srcObject = remoteStream;
@@ -136,13 +133,12 @@ async function startCall() {
         }
     };
 
-    // Create offer
+    // OFFER
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-
     await db.collection(roomName).doc("offer").set({ type: "offer", sdp: offer.sdp });
 
-    // Wait for answer
+    // ANSWER
     db.collection(roomName).doc("answer").onSnapshot(async snapshot => {
         if (snapshot.exists) {
             let answer = snapshot.data();
@@ -152,7 +148,7 @@ async function startCall() {
         }
     });
 
-    // ICE candidates
+    // ICE CANDIDATES
     db.collection(roomName).doc("candidates").collection("all").onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
             if (change.type === "added") {
@@ -163,9 +159,9 @@ async function startCall() {
     });
 }
 
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 // CONTROLS
-//////////////////////////////////////////////////////////////
+//////////////////////////////////
 function toggleMic() {
     micEnabled = !micEnabled;
     localStream.getAudioTracks()[0].enabled = micEnabled;
@@ -185,7 +181,6 @@ async function startScreen() {
         const screenTrack = screenStream.getTracks()[0];
         const sender = pc.getSenders().find(s => s.track.kind === "video");
         sender.replaceTrack(screenTrack);
-
         screenTrack.onended = () => {
             sender.replaceTrack(localStream.getVideoTracks()[0]);
         };
