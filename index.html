@@ -30,9 +30,9 @@
 
 <div id="callBox" style="display:none;">
     <div>
-        <button onclick="toggleMic()">Mute / Unmute</button>
+        <button id="muteBtn" onclick="toggleMic()">Mute / Unmute</button>
         <button onclick="toggleCam()">Camera On / Off</button>
-        <button onclick="startScreen()">Share Screen</button>
+        <button id="screenBtn" onclick="startScreen()">Share Screen</button>
     </div>
     <div class="grid" id="videoGrid">
         <div class="videoContainer">
@@ -44,6 +44,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
 <script>
 //////////////// FIREBASE CONFIG //////////////////
 const firebaseConfig = {
@@ -89,7 +90,7 @@ function listenNewUsers(){
     db.collection(roomName).onSnapshot(snapshot=>{
         snapshot.docChanges().forEach(change=>{
             let data=change.doc.data();
-            if(change.type==="added" && data.userId!==localId){
+            if(change.type==="added" && data.userId && data.userId!==localId){
                 if(!peers[data.userId]) createPeerConnection(data.userId);
             }
         });
@@ -145,11 +146,13 @@ function toggleCam(){
 }
 
 async function startScreen(){
+    // check support
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+        alert("Screen sharing not supported on this device/browser. Use Chrome/Edge/Firefox desktop.");
+        return;
+    }
     try{
-        let screenStream;
-        if(navigator.mediaDevices.getDisplayMedia){
-            screenStream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1920},height:{ideal:1080}}});
-        }else{ alert("Screen share not supported"); return;}
+        const screenStream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1920},height:{ideal:1080}}});
         const track=screenStream.getTracks()[0];
         Object.values(peers).forEach(pc=>{
             const sender=pc.getSenders().find(s=>s.track.kind==="video");
