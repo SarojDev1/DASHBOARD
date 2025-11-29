@@ -28,7 +28,6 @@
 <h1>SAROJ PRODUCTION PANEL</h1>
 <h3>Admin + Teams | Video Call | Screen Share | Mute | Camera</h3>
 
-<!-- LOGIN -->
 <div id="loginBox">
     <h2>Login</h2>
     <input id="username" placeholder="Enter username"><br>
@@ -36,7 +35,6 @@
     <button onclick="login()">Login</button>
 </div>
 
-<!-- CALL -->
 <div id="callBox" style="display:none;">
     <h2>Connected to: production-room</h2>
 
@@ -56,14 +54,13 @@
     </div>
 </div>
 
-<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
 <script>
-//////////////////////////////////
+/////////////////////////////
 // FIREBASE CONFIG
-//////////////////////////////////
+/////////////////////////////
 const firebaseConfig = {
   apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
   authDomain: "business-bfddf.firebaseapp.com",
@@ -76,9 +73,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-//////////////////////////////////
+/////////////////////////////
 // GLOBAL VARIABLES
-//////////////////////////////////
+/////////////////////////////
 const roomName = "production-room";
 let pc;
 let localStream;
@@ -86,29 +83,24 @@ let remoteStream;
 let micEnabled = true;
 let camEnabled = true;
 
-//////////////////////////////////
+/////////////////////////////
 // LOGIN
-//////////////////////////////////
+/////////////////////////////
 function login() {
     let user = document.getElementById("username").value;
     let pass = document.getElementById("password").value;
 
-    if (user === "admin" && pass === "12345") {
-        startCall();
-    } else if (user !== "" && pass === "") {
-        startCall();
-    } else {
-        alert("Wrong login!");
-        return;
-    }
+    if (user === "admin" && pass === "12345") startCall();
+    else if (user !== "" && pass === "") startCall();
+    else { alert("Wrong login!"); return; }
 
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("callBox").style.display = "block";
 }
 
-//////////////////////////////////
+/////////////////////////////
 // START VIDEO CALL
-//////////////////////////////////
+/////////////////////////////
 async function startCall() {
     localStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
@@ -123,45 +115,32 @@ async function startCall() {
 
     localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    pc.ontrack = event => {
-        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-    };
+    pc.ontrack = event => event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
 
     pc.onicecandidate = event => {
-        if (event.candidate) {
-            db.collection(roomName).doc("candidates").collection("all").add(event.candidate.toJSON());
-        }
+        if (event.candidate) db.collection(roomName).doc("candidates").collection("all").add(event.candidate.toJSON());
     };
 
-    // OFFER
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await db.collection(roomName).doc("offer").set({ type: "offer", sdp: offer.sdp });
 
-    // ANSWER
     db.collection(roomName).doc("answer").onSnapshot(async snapshot => {
-        if (snapshot.exists) {
-            let answer = snapshot.data();
-            if (!pc.currentRemoteDescription) {
-                await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            }
+        if (snapshot.exists && !pc.currentRemoteDescription) {
+            await pc.setRemoteDescription(new RTCSessionDescription(snapshot.data()));
         }
     });
 
-    // ICE CANDIDATES
     db.collection(roomName).doc("candidates").collection("all").onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
-            if (change.type === "added") {
-                let data = change.doc.data();
-                pc.addIceCandidate(new RTCIceCandidate(data));
-            }
+            if (change.type === "added") pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
         });
     });
 }
 
-//////////////////////////////////
+/////////////////////////////
 // CONTROLS
-//////////////////////////////////
+/////////////////////////////
 function toggleMic() {
     micEnabled = !micEnabled;
     localStream.getAudioTracks()[0].enabled = micEnabled;
@@ -175,15 +154,23 @@ function toggleCam() {
 
 async function startScreen() {
     try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
-        });
+        let screenStream;
+        if (navigator.mediaDevices.getDisplayMedia) {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
+            });
+        } else if (navigator.getDisplayMedia) {
+            screenStream = await navigator.getDisplayMedia({ video: true });
+        } else {
+            alert("Screen share is not supported on this device/browser.");
+            return;
+        }
+
         const screenTrack = screenStream.getTracks()[0];
         const sender = pc.getSenders().find(s => s.track.kind === "video");
         sender.replaceTrack(screenTrack);
-        screenTrack.onended = () => {
-            sender.replaceTrack(localStream.getVideoTracks()[0]);
-        };
+
+        screenTrack.onended = () => sender.replaceTrack(localStream.getVideoTracks()[0]);
     } catch(err) {
         alert("Screen share failed: " + err);
     }
