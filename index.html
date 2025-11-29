@@ -1,1295 +1,225 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fire Scrim Command Center</title>
-    <!-- Load Tailwind CSS from CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Custom Styling and Fonts -->
+    <title>SAROJ PRODUCTION PANEL</title>
     <style>
-        /* FIX FOR GITHUB PAGES / HOSTING: Apply base dark theme immediately to prevent white flash */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Bebas+Neue:wght@400;700&display=swap');
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #0d0d1a; /* Base dark background */
-            color: #e5e7eb; /* Base text-gray-100 color */
+        body {
+            font-family: Arial;
+            background: #0d0d0d;
+            color: white;
+            text-align: center;
         }
-        h1, h2, #sidebar h2 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
-
-        /* Custom Free Fire Accent (High-Energy Red/Orange) */
-        .bg-ff-accent { background-color: #ff3300; }
-        .text-ff-accent { color: #ff3300; }
-        .border-ff-accent { border-color: #ff3300; }
-        
-        /* Dark Card Background (Deep Blue/Purple) */
-        .bg-ff-card { background-color: #1a1a2e; }
-
-        /* Sidebar Transition and Size */
-        #sidebar {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 80%;
-            max-width: 300px;
+        #loginBox, #callBox { margin-top: 40px; }
+        input {
+            padding: 10px;
+            width: 260px;
+            margin: 6px;
+            border-radius: 6px;
+            border: none;
         }
-
-        /* Scrim Item Enhancements */
-        .scrim-item {
-            transition: all 0.2s ease-in-out;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-            border: 1px solid #262640;
+        button {
+            padding: 10px 20px;
+            border: none;
+            background: #7b2cff;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
         }
-        .scrim-item:hover {
-            transform: translateY(-3px) scale(1.01);
-            box-shadow: 0 8px 25px rgba(255, 51, 0, 0.25);
-            border-color: #ff3300;
+        video {
+            width: 45%;
+            margin: 10px;
+            background: black;
+            border-radius: 6px;
         }
-        
-        /* Input/Form Focus */
-        input:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255, 51, 0, 0.5);
-        }
-
-        /* Scrollbar */
-        .scrim-list-container {
-            max-height: 70vh; 
-            overflow-y: auto;
-            border-radius: 0.75rem;
-        }
-        .scrim-list-container::-webkit-scrollbar { width: 8px; }
-        .scrim-list-container::-webkit-scrollbar-thumb { background-color: #ff3300; border-radius: 4px; }
-        .scrim-list-container::-webkit-scrollbar-track { background-color: #0d0d1a; }
-
-        /* Form styling */
-        .form-panel {
-            box-shadow: 0 0 40px rgba(255, 51, 0, 0.1); 
-        }
-        .form-input-field {
-            background-color: #262640;
-            border: 1px solid #3d3d57;
-            transition: all 0.2s;
-        }
-        .form-input-field:focus {
-            background-color: #1a1a2e;
-            border-color: #ff3300;
-        }
-
-        /* Spinner for Loading State */
-        .spinner {
-            border: 4px solid #3d3d57;
-            border-top: 4px solid #ff3300;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        #controls button {
+            margin: 5px;
         }
     </style>
-    
-    <!-- Load Lucide Icons from CDN and initialize on load -->
-    <script type="module">
-        import { createIcons, Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye, Loader } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
-        document.addEventListener('DOMContentLoaded', () => {
-            createIcons({
-                icons: { Wallet, Swords, XCircle, PlusCircle, CheckCircle, Menu, X, ListChecks, Info, Users, Key, Eye, Loader },
-                attrs: { width: 24, height: 24, class: 'inline-block mr-2' }
-            });
-        });
-    </script>
 </head>
-<body class="min-h-screen p-4 sm:p-8">
 
-    <!-- Firebase Initialization and Utility Script -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, setDoc, addDoc, updateDoc, deleteDoc, runTransaction, getDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { createIcons, XCircle, CheckCircle, Key, Eye } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
+<body>
+
+<h1>SAROJ PRODUCTION PANEL</h1>
+<h3>Admin + Teams | Video Call | Screen Share | Mute | Camera</h3>
+
+<!-- LOGIN PANEL -->
+<div id="loginBox">
+    <h2>Login</h2>
+    <input id="username" placeholder="Enter username"><br>
+    <input id="password" type="password" placeholder="Enter password (Admin only)"><br>
+    <button onclick="login()">Login</button>
+</div>
+
+<!-- CALL PANEL -->
+<div id="callBox" style="display:none;">
+    <h2>Connected to: production-room</h2>
+
+    <video id="localVideo" autoplay playsinline muted></video>
+    <video id="remoteVideo" autoplay playsinline></video>
+
+    <div id="controls">
+        <button onclick="toggleMic()">Mute / Unmute</button>
+        <button onclick="toggleCam()">Camera On / Off</button>
+        <button onclick="startScreen()">Share Screen</button>
+    </div>
+</div>
+
+<!-- FIREBASE LIBRARIES -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+<script>
+//////////////////////////////////////////////////////////////
+// 🔥 FIREBASE CONFIG (YOUR CONFIG)
+//////////////////////////////////////////////////////////////
+const firebaseConfig = {
+  apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
+  authDomain: "business-bfddf.firebaseapp.com",
+  projectId: "business-bfddf",
+  storageBucket: "business-bfddf.firebasestorage.app",
+  messagingSenderId: "536592740939",
+  appId: "1:536592740939:web:a59d16003542ee3b7b53ce",
+  measurementId: "G-7HJWD72M12"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+//////////////////////////////////////////////////////////////
+// GLOBAL VARIABLES
+//////////////////////////////////////////////////////////////
+const roomName = "production-room";
+let pc;
+let localStream;
+let remoteStream;
+let micEnabled = true;
+let camEnabled = true;
+
+//////////////////////////////////////////////////////////////
+// LOGIN SYSTEM
+//////////////////////////////////////////////////////////////
+function login() {
+    let user = document.getElementById("username").value;
+    let pass = document.getElementById("password").value;
+
+    if (user === "admin" && pass === "12345") {
+        // admin login
+        startCall();
+    } else if (user !== "" && pass === "") {
+        // team login
+        startCall();
+    } else {
+        alert("Wrong login details!");
+        return;
+    }
+
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("callBox").style.display = "block";
+}
+
+//////////////////////////////////////////////////////////////
+// START VIDEO CALL
+//////////////////////////////////////////////////////////////
+async function startCall() {
+    localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+    });
+
+    document.getElementById("localVideo").srcObject = localStream;
+
+    pc = new RTCPeerConnection({
+        iceServers: [
+            { urls: ["stun:stun.l.google.com:19302"] }
+        ]
+    });
+
+    remoteStream = new MediaStream();
+    document.getElementById("remoteVideo").srcObject = remoteStream;
+
+    localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+    });
 
-        // Global Firebase variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // --- Defensive Firebase Configuration Block (Ensures projectId exists) ---
-        const firebaseConfig = (() => {
-            // A minimal, complete configuration structure with fallbacks
-            const defaultConfig = {
-                // API key provided by the user
-                apiKey: "AIzaSyAja4LB1Vl6VMJGojd-p1-C3AqtTffQOLA", 
-                authDomain: "",
-                // CRITICAL FALLBACK: Ensure projectId is always present
-                projectId: "scrim-platform-default", 
-                storageBucket: "",
-                messagingSenderId: "",
-                appId: appId 
-            };
-            
-            try {
-                const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-                const parsedConfig = JSON.parse(configString);
-                
-                // Merge parsed config with defaults, prioritizing parsed values.
-                return { ...defaultConfig, ...parsedConfig };
-            } catch (e) {
-                console.error("Failed to parse __firebase_config. Using robust default config.", e);
-                return defaultConfig;
-            }
-        })();
-        // ------------------------------------------------------------------------
-
-        let db, auth, userId = null;
-        let isAuthReady = false;
-        // NEW STATE: Flag to confirm initial data load from Firestore
-        let isDataLoaded = false; 
-        let allScrims = []; 
-        let viewMode = 'running'; 
-        let currentWalletBalance = 0; 
-
-        // Firestore Path Definitions
-        const SCRIM_COLLECTION = `artifacts/${appId}/public/data/scrims`;
-        const USER_WALLET_PATH = (uid) => `artifacts/${appId}/users/${uid}/wallet/balance`;
-
-        setLogLevel('debug');
-        
-        // --- Core Firebase Initialization and Authentication ---
-        const initFirebase = async () => {
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // Set persistence to browser session to maintain sign-in within the session
-                await setPersistence(auth, browserSessionPersistence);
-                
-                // Set up the state change listener BEFORE the initial sign-in attempt
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        document.getElementById('current-user-id').textContent = userId;
-                        document.getElementById('app-status').textContent = "Status: Online (Authenticated)";
-                        
-                        // Set readiness flag to TRUE only after user ID is confirmed
-                        isAuthReady = true; 
-
-                        setupRealtimeListeners();
-                        
-                    } else {
-                        // Attempt sign-in if no user is found initially
-                        performSignIn();
-                    }
-                });
-
-                // If onAuthStateChanged finds a user, the listener handles it. If not, 
-                // and the page is being loaded for the first time, we perform the sign-in.
-                if (!auth.currentUser) {
-                    await performSignIn();
-                }
-
-            } catch (error) {
-                // Display the error message clearly in the UI
-                document.getElementById('app-status').textContent = `FATAL ERROR: ${error.message}`;
-                console.error("Firebase Initialization Failure:", error);
-            }
-        };
-        
-        const performSignIn = async () => {
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                document.getElementById('app-status').textContent = `Sign-in Error: ${error.message}`;
-                console.error("Sign-in Failure:", error);
-            }
-        };
-
-
-        // --- UI Functions ---
-
-        const toggleMenu = () => {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            const isOpen = sidebar.classList.contains('translate-x-0');
-
-            if (isOpen) {
-                sidebar.classList.remove('translate-x-0');
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-            } else {
-                sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('translate-x-0');
-                overlay.classList.remove('hidden');
-            }
-        };
-        window.toggleMenu = toggleMenu; 
-
-        const setViewMode = (mode) => {
-            viewMode = mode;
-            toggleMenu(); 
-            updateMainView();
-        };
-        window.setViewMode = setViewMode; 
-
-        const updateMainView = () => {
-            const titleEl = document.getElementById('main-content-title');
-            const listContainerEl = document.getElementById('scrim-list-container');
-            const aboutEl = document.getElementById('about-section');
-            const loadingEl = document.getElementById('loading-indicator');
-
-            listContainerEl.classList.add('hidden');
-            aboutEl.classList.add('hidden');
-            loadingEl.classList.add('hidden');
-
-            // --- CRITICAL CHECK: Show loading if data hasn't arrived yet ---
-            if (isAuthReady && !isDataLoaded) {
-                titleEl.innerHTML = '<span data-lucide="Loader" class="text-white mr-2 animate-spin"></span> Fetching Scrim Data...';
-                loadingEl.classList.remove('hidden');
-                return;
-            }
-
-            // If data is loaded or we are in 'about' mode, proceed with rendering
-            switch (viewMode) {
-                case 'running':
-                    titleEl.innerHTML = '<span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)';
-                    listContainerEl.classList.remove('hidden');
-                    // CRITICAL FILTER: Only show scrims that are 'Open' or 'Full'
-                    renderScrims(allScrims.filter(s => s.status === 'Open' || s.status === 'Full'));
-                    break;
-                case 'finished':
-                    titleEl.innerHTML = '<span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Matches';
-                    listContainerEl.classList.remove('hidden');
-                    // FILTER: Show scrims that are 'Finished'
-                    renderScrims(allScrims.filter(s => s.status === 'Finished' || s.status === 'AwaitingResults'));
-                    break;
-                case 'about':
-                    titleEl.innerHTML = '<span data-lucide="Info" class="text-ff-accent"></span> Platform Info';
-                    aboutEl.classList.remove('hidden');
-                    break;
-            }
-            // Re-render Lucide icons for the title element after innerHTML change
-            import('https://unpkg.com/lucide@latest/dist/esm/lucide.js')
-                .then(({ createIcons, Swords, ListChecks, Info, Loader }) => {
-                    createIcons({
-                        icons: { Swords, ListChecks, Info, Loader },
-                        attrs: { width: 24, height: 24, class: 'inline-block mr-2' },
-                        elements: titleEl.querySelectorAll('[data-lucide]')
-                    });
-                });
-        };
-
-        // --- Entry Fee Toggle Logic ---
-        const toggleEntryFee = (isFree) => {
-            const entryInput = document.getElementById('scrim-entry');
-            const entryLabel = document.getElementById('scrim-entry-label');
-            
-            if (isFree) {
-                entryInput.value = 0;
-                entryInput.disabled = true;
-                entryInput.classList.add('opacity-50', 'cursor-not-allowed');
-                entryLabel.innerHTML = 'Entry Fee (C) <span class="text-green-400 font-bold">(FREE)</span>';
-            } else {
-                entryInput.disabled = false;
-                entryInput.value = 100; 
-                entryInput.classList.remove('opacity-50', 'cursor-not-allowed');
-                entryLabel.textContent = 'Entry Fee (C)';
-            }
-        };
-        window.toggleEntryFee = toggleEntryFee;
-
-
-        // --- Scrim and Wallet Data Management ---
-
-        const setupRealtimeListeners = () => {
-            if (!db || !userId) return;
-
-            // 1. Scrims Listener (Public Data)
-            const scrimsQuery = query(collection(db, SCRIM_COLLECTION));
-            onSnapshot(scrimsQuery, (snapshot) => {
-                allScrims = [];
-                snapshot.forEach(doc => {
-                    allScrims.push({ id: doc.id, ...doc.data() });
-                });
-                
-                isDataLoaded = true; // Set flag to true after the first data retrieval
-                
-                const activeScrimsCount = allScrims.filter(s => s.status === 'Open' || s.status === 'Full').length;
-                console.log("==================================================");
-                console.log("FIRESTORE UPDATE RECEIVED (onSnapshot):");
-                console.log(`- Total Scrims in Database: ${allScrims.length}`);
-                console.log(`- Scrims visible in 'Active Missions' View: ${activeScrimsCount}`);
-                console.log("==================================================");
-
-                // This call ensures the view is updated only when data is fully loaded
-                updateMainView(); 
-            }, (error) => console.error("Error listening to scrims:", error));
-
-            // 2. Wallet Listener (Private User Data)
-            const walletDocRef = doc(db, USER_WALLET_PATH(userId));
-            onSnapshot(walletDocRef, (docSnap) => {
-                const balance = docSnap.exists() ? docSnap.data().balance : 0;
-                renderWallet(balance);
-            }, (error) => console.error("Error listening to wallet:", error));
-
-            initWallet();
-        };
-
-        const initWallet = async () => {
-            if (!db || !userId) return;
-            const walletDocRef = doc(db, USER_WALLET_PATH(userId));
-            try {
-                const docSnap = await getDoc(walletDocRef);
-                if (!docSnap.exists()) {
-                    // Initialize wallet to 0 for new users
-                    await setDoc(walletDocRef, { balance: 0, lastUpdated: serverTimestamp() });
-                }
-            } catch (e) {
-                console.error("Error initializing wallet:", e);
-            }
-        };
-
-        const updateWalletBalance = async (uid, amount) => {
-            if (!db) throw new Error("Database not initialized.");
-            const walletDocRef = doc(db, USER_WALLET_PATH(uid));
-            
-            // Use transaction for safe balance update
-            return runTransaction(db, async (transaction) => {
-                const docSnap = await transaction.get(walletDocRef);
-                const currentBalance = docSnap.exists() ? docSnap.data().balance : 0;
-                const newBalance = currentBalance + amount;
-
-                if (newBalance < 0) {
-                    throw new Error("Insufficient funds for this action.");
-                }
-
-                transaction.set(walletDocRef, { balance: newBalance, lastUpdated: serverTimestamp() }, { merge: true });
-                return newBalance;
-            });
-        };
-        
-        const createScrim = async (e) => {
-            e.preventDefault();
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
-
-            const title = document.getElementById('scrim-title').value;
-            const entryFee = parseInt(document.getElementById('scrim-entry').value);
-            const prize = parseInt(document.getElementById('scrim-prize').value);
-            // New fields from the form
-            const mapType = document.getElementById('scrim-map-type').value;
-            const maxTeams = parseInt(document.getElementById('scrim-max-teams').value);
-            
-            const isPaid = entryFee > 0;
-
-            if (!title || prize < 100 || isNaN(prize)) {
-                return showMessage("Please enter a valid title and prize (min 100).", "error");
-            }
-            if (isPaid && entryFee < 10) {
-                 return showMessage("Paid scrims must have an entry fee of at least 10 credits.", "error");
-            }
-
-            // Creator joins as the first team automatically
-            const creatorTeamName = `Creator_${userId.substring(0, 4)}`;
-
-            try {
-                // 1. Deduct entry fee before creating the document
-                if (isPaid) {
-                    await updateWalletBalance(userId, -entryFee);
-                }
-
-                // 2. Create the Scrim Document
-                const docRef = await addDoc(collection(db, SCRIM_COLLECTION), {
-                    creatorId: userId,
-                    title: title,
-                    entryFee: entryFee,
-                    prize: prize,
-                    status: 'Open', // <-- Starts as 'Open'
-                    mapType: mapType, // New field
-                    maxTeams: maxTeams, // Updated field
-                    joiners: [{ id: userId, teamName: creatorTeamName, paid: true }],
-                    idPass: { id: '', pass: '' }, 
-                    results: null, 
-                    createdAt: serverTimestamp()
-                });
-                document.getElementById('create-scrim-form').reset();
-                // CONFIRMATION: Show success message. The onSnapshot listener will handle the UI update.
-                showMessage(`Scrim "${title}" launched! ID: ${docRef.id.substring(0, 6)}... ${entryFee} credits paid. The list will update instantly via real-time sync.`, "success"); 
-                toggleEntryFee(false); 
-
-            } catch (error) {
-                // If updateWalletBalance failed (e.g., insufficient funds), catch it here
-                if (error.message.includes("Insufficient funds")) {
-                    showMessage("Failed to launch: Insufficient credits for entry fee.", "error");
-                } else {
-                    showMessage(`Failed to launch scrim: ${error.message}`, "error");
-                }
-            }
-        };
-        window.createScrim = createScrim;
-
-        // Wrapper to open Join Scrim modal
-        window.openJoinScrimModal = (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
-            
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (!scrim) return showMessage("Scrim not found.", "error");
-
-            const isJoined = scrim.joiners.some(j => j.id === userId);
-            if (isJoined) return showMessage("You have already registered a team for this scrim.", "info");
-
-            // Check against maxTeams instead of maxPlayers
-            if (scrim.joiners.length >= scrim.maxTeams) return showMessage("This scrim is full.", "error");
-
-            document.getElementById('join-scrim-title').textContent = scrim.title;
-            document.getElementById('join-scrim-fee').textContent = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
-            
-            // Clear previous data and attach handler
-            document.getElementById('join-team-name').value = '';
-            const joinForm = document.getElementById('join-scrim-form');
-            joinForm.onsubmit = (e) => {
-                e.preventDefault();
-                const teamName = document.getElementById('join-team-name').value.trim();
-                if (!teamName) return showMessage("Team Name is required.", "error");
-                joinScrim(scrim, teamName);
-                closeJoinScrimModal();
-            };
-
-            document.getElementById('join-scrim-modal').classList.remove('hidden');
-        };
-
-        window.closeJoinScrimModal = () => {
-            document.getElementById('join-scrim-modal').classList.add('hidden');
-        };
-
-
-        const joinScrim = async (scrim, teamName) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error");
-
-            // Check for duplicate team name
-            const teamNameExists = scrim.joiners.some(j => j.teamName === teamName);
-            if (teamNameExists) return showMessage(`Team name "${teamName}" is already registered. Choose another.`, "error");
-
-            try {
-                // 1. Deduct entry fee if required
-                if (scrim.entryFee > 0) {
-                    await updateWalletBalance(userId, -scrim.entryFee);
-                }
-
-                // 2. Update the document to add the new joiner
-                const scrimDocRef = doc(db, SCRIM_COLLECTION, scrim.id);
-                const newJoiner = { id: userId, teamName: teamName, paid: true };
-                const newJoiners = [...scrim.joiners, newJoiner];
-                // Check against maxTeams
-                const newStatus = newJoiners.length >= scrim.maxTeams ? 'Full' : 'Open';
-
-                await updateDoc(scrimDocRef, { joiners: newJoiners, status: newStatus });
-
-                showMessage(`Joined scrim: "${scrim.title}" as Team ${teamName}. Good luck!`, "success");
-            } catch (error) {
-                if (error.message.includes("Insufficient funds")) {
-                    showMessage("Failed to join: Insufficient funds in your wallet.", "error");
-                } else {
-                    showMessage(`Failed to join scrim: ${error.message}`, "error");
-                }
-            }
-        };
-
-        // --- ID/Pass Management ---
-
-        window.openIdPassModal = (scrimId) => {
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (!scrim) return showMessage("Scrim not found.", "error");
-
-            const isCreator = scrim.creatorId === userId;
-            const isJoined = scrim.joiners.some(j => j.id === userId);
-
-            if (isCreator) {
-                // Creator: Show upload/edit form
-                document.getElementById('id-pass-title').textContent = `Upload Credentials for ${scrim.title}`;
-                document.getElementById('id-pass-form').classList.remove('hidden');
-                document.getElementById('id-pass-display').classList.add('hidden');
-                
-                document.getElementById('scrim-room-id').value = scrim.idPass?.id || '';
-                document.getElementById('scrim-room-pass').value = scrim.idPass?.pass || '';
-
-                const idPassForm = document.getElementById('id-pass-form');
-                idPassForm.onsubmit = (e) => {
-                    e.preventDefault();
-                    uploadIdPass(scrimId);
-                    closeIdPassModal();
-                };
-            } else if (isJoined && scrim.idPass?.id && scrim.idPass?.pass) {
-                // Joiner: Show display view
-                document.getElementById('id-pass-title').textContent = `Credentials for ${scrim.title}`;
-                document.getElementById('id-pass-form').classList.add('hidden');
-                document.getElementById('id-pass-display').classList.remove('hidden');
-
-                document.getElementById('display-room-id').textContent = scrim.idPass.id;
-                document.getElementById('display-room-pass').textContent = scrim.idPass.pass;
-            } else {
-                return showMessage("Credentials not yet available or you are not a registered player.", "info");
-            }
-
-            document.getElementById('id-pass-modal').classList.remove('hidden');
-        };
-
-        window.closeIdPassModal = () => {
-            document.getElementById('id-pass-modal').classList.add('hidden');
-        };
-
-        const uploadIdPass = async (scrimId) => {
-            if (!isAuthReady || !userId) return;
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (scrim.creatorId !== userId) return showMessage("Only the creator can upload credentials.", "error");
-
-            const id = document.getElementById('scrim-room-id').value.trim();
-            const pass = document.getElementById('scrim-room-pass').value.trim();
-
-            if (!id || !pass) return showMessage("Both Room ID and Password are required.", "error");
-
-            try {
-                const scrimDocRef = doc(db, SCRIM_COLLECTION, scrimId);
-                await updateDoc(scrimDocRef, { 
-                    idPass: { id, pass },
-                    // Status transition logic remains
-                    status: scrim.status === 'Open' && scrim.joiners.length === scrim.maxTeams ? 'Full' : scrim.status
-                });
-                showMessage("Room credentials uploaded successfully!", "success");
-            } catch (error) {
-                showMessage(`Failed to upload credentials: ${error.message}`, "error");
-            }
-        };
-
-
-        // --- Results and Prize Distribution ---
-
-        window.openResultsModal = (scrimId) => {
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready. Please wait.", "error"); 
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (!scrim || scrim.creatorId !== userId) return showMessage("Only the creator can submit results.", "error");
-
-            if (scrim.joiners.length < 3) {
-                 return showMessage("At least 3 teams must be registered to determine 1st, 2nd, and 3rd place.", "info");
-            }
-            
-            const teamNames = scrim.joiners.map(j => j.teamName).sort();
-            const selectFields = ['#first-place-team', '#second-place-team', '#third-place-team'];
-
-            // Populate the dropdowns with unique team names
-            selectFields.forEach(selector => {
-                const selectEl = document.querySelector(selector);
-                selectEl.innerHTML = '<option value="" disabled selected>Select Team</option>';
-                teamNames.forEach(teamName => {
-                    const option = document.createElement('option');
-                    option.value = teamName;
-                    option.textContent = teamName;
-                    selectEl.appendChild(option);
-                });
-            });
-
-            // Set up form submission handler
-            const resultsForm = document.getElementById('results-form');
-            resultsForm.onsubmit = (e) => {
-                e.preventDefault();
-                submitResults(scrimId);
-                closeResultsModal();
-            };
-
-            document.getElementById('results-scrim-title').textContent = scrim.title;
-            document.getElementById('results-modal').classList.remove('hidden');
-        };
-
-        window.closeResultsModal = () => {
-            document.getElementById('results-modal').classList.add('hidden');
-        };
-
-        const submitResults = async (scrimId) => {
-            const first = document.getElementById('first-place-team').value;
-            const second = document.getElementById('second-place-team').value;
-            const third = document.getElementById('third-place-team').value;
-
-            if (!first || !second || !third) {
-                return showMessage("Please select a team for all 3 podium places.", "error");
-            }
-
-            const winners = [first, second, third];
-            if (new Set(winners).size !== 3) {
-                return showMessage("The 1st, 2nd, and 3rd place teams must be unique.", "error");
-            }
-
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (!scrim) return showMessage("Scrim not found.", "error");
-
-            showConfirmationModal(`Confirm results: 1st: ${first}, 2nd: ${second}, 3rd: ${third}. This will distribute ${scrim.prize.toLocaleString()} C.`, async () => {
-                try {
-                    // 1. Distribute Prizes
-                    await distributePrizes(scrim, { first, second, third });
-
-                    // 2. Update Scrim Status and Results
-                    const scrimDocRef = doc(db, SCRIM_COLLECTION, scrimId);
-                    await updateDoc(scrimDocRef, {
-                        status: 'Finished', // <-- Status changes to Finished here
-                        results: { first, second, third, distributed: true }
-                    });
-
-                    showMessage(`Results submitted and ${scrim.prize.toLocaleString()} C distributed successfully!`, "success");
-                } catch (error) {
-                    showMessage(`Prize distribution error: ${error.message}`, "error");
-                }
-            });
-        };
-
-        const distributePrizes = async (scrim, results) => {
-            const totalPrize = scrim.prize;
-            // 1st: 50%, 2nd: 30%, 3rd: 20%
-            const prizeDistribution = {
-                first: Math.floor(totalPrize * 0.50),
-                second: Math.floor(totalPrize * 0.30),
-                third: Math.floor(totalPrize * 0.20)
-            };
-
-            const updates = [];
-
-            // Helper to find the user ID associated with the winning team name
-            const getWinnerUserId = (teamName) => {
-                const winner = scrim.joiners.find(j => j.teamName === teamName);
-                if (!winner) throw new Error(`Could not find player ID for winning team: ${teamName}`);
-                return winner.id;
-            };
-
-            // Process 1st Place
-            const firstId = getWinnerUserId(results.first);
-            updates.push(updateWalletBalance(firstId, prizeDistribution.first));
-
-            // Process 2nd Place
-            const secondId = getWinnerUserId(results.second);
-            updates.push(updateWalletBalance(secondId, prizeDistribution.second));
-
-            // Process 3rd Place
-            const thirdId = getWinnerUserId(results.third);
-            updates.push(updateWalletBalance(thirdId, prizeDistribution.third));
-
-            // Execute all prize updates concurrently
-            await Promise.all(updates);
-        };
-        
-        // Wrapper for delete scrim action (ensures confirmation)
-        window.deleteScrimWrapper = (scrimId) => {
-            if (!isAuthReady || !userId) return;
-            const scrim = allScrims.find(s => s.id === scrimId);
-            if (!scrim || scrim.creatorId !== userId) return showMessage("Only the creator can delete finished scrims.", "error");
-            
-            showConfirmationModal("Are you sure you want to DELETE this finished scrim? This action is permanent and removes the match record for all users.", async () => {
-                try {
-                    await deleteDoc(doc(db, SCRIM_COLLECTION, scrimId));
-                    showMessage("Scrim successfully deleted. Match record removed.", "success");
-                } catch (error) {
-                    showMessage(`Failed to delete scrim: ${error.message}`, "error");
-                }
-            });
-        };
-
-        // --- Wallet Modal Handlers ---
-
-        window.openWalletModal = () => {
-            if (!userId) return showMessage("Authentication not ready. Please wait.", "error");
-            document.getElementById('modal-current-balance').textContent = currentWalletBalance.toLocaleString() + ' C';
-            document.getElementById('wallet-modal').classList.remove('hidden');
-        };
-
-        window.closeWalletModal = () => {
-            document.getElementById('wallet-modal').classList.add('hidden');
-        };
-
-        const handleDeposit = async (e) => {
-            e.preventDefault();
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
-
-            const amount = parseInt(document.getElementById('deposit-amount').value);
-
-            if (amount <= 0 || isNaN(amount)) {
-                return showMessage("Deposit amount must be a positive number.", "error");
-            }
-            
-            showConfirmationModal(`Are you sure you want to deposit ${amount.toLocaleString()} C?`, async () => {
-                try {
-                    await updateWalletBalance(userId, amount);
-                    document.getElementById('deposit-form').reset();
-                    showMessage(`Successfully deposited ${amount.toLocaleString()} C.`, "success");
-                    closeWalletModal();
-                } catch (error) {
-                    showMessage(`Failed to deposit credits: ${error.message}`, "error");
-                }
-            });
-        };
-        window.handleDeposit = handleDeposit;
-
-
-        const handleWithdraw = async (e) => {
-            e.preventDefault();
-            if (!isAuthReady || !userId) return showMessage("Authentication is not ready.", "error");
-
-            const amount = parseInt(document.getElementById('withdraw-amount').value);
-
-            if (amount <= 0 || isNaN(amount)) {
-                return showMessage("Withdrawal amount must be a positive number.", "error");
-            }
-
-            showConfirmationModal(`Are you sure you want to withdraw ${amount.toLocaleString()} C?`, async () => {
-                try {
-                    await updateWalletBalance(userId, -amount); 
-                    document.getElementById('withdraw-form').reset();
-                    showMessage(`Successfully withdrew ${amount.toLocaleString()} C.`, "success");
-                    closeWalletModal();
-                } catch (error) {
-                    if (error.message.includes("Insufficient funds")) {
-                         showMessage("Withdrawal failed: You do not have enough credits.", "error");
-                    } else {
-                         showMessage(`Failed to withdraw credits: ${error.message}`, "error");
-                    }
-                }
-            });
-        };
-        window.handleWithdraw = handleWithdraw;
-
-
-        // --- UI Rendering Functions ---
-
-        const renderWallet = (balance) => {
-            currentWalletBalance = balance; 
-            const balanceEl = document.getElementById('wallet-balance');
-            balanceEl.textContent = balance.toLocaleString();
-            balanceEl.classList.toggle('text-red-400', balance < 100);
-            balanceEl.classList.toggle('text-green-400', balance >= 100);
-        };
-
-        const getStatusClasses = (status) => {
-            switch (status) {
-                case 'Open': return 'bg-green-500 text-black';
-                case 'Full': return 'bg-yellow-500 text-black';
-                case 'Finished': return 'bg-ff-accent text-white';
-                default: return 'bg-gray-600 text-white';
-            }
-        };
-
-        const renderScrims = (scrims) => {
-            const container = document.getElementById('scrim-list');
-            container.innerHTML = ''; 
-
-            if (scrims.length === 0) {
-                container.innerHTML = `<p class="text-center text-gray-500 p-8 border border-dashed border-gray-700 rounded-xl">
-                    ${viewMode === 'running' ? 'No active scrims available. Deploy a match to start competing!' : 'No matches have been finished yet.'}
-                </p>`;
-                return;
-            }
-
-            // Sort data locally since orderBy() is avoided in queries
-            scrims.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-
-            scrims.forEach(scrim => {
-                const isCreator = scrim.creatorId === userId;
-                const isJoined = scrim.joiners.some(j => j.id === userId);
-                // Use maxTeams for the check
-                const isFull = scrim.joiners.length >= scrim.maxTeams; 
-                const hasIdPass = scrim.idPass?.id && scrim.idPass?.pass;
-
-                let actionButton = '';
-                let secondaryActions = '';
-                
-                const creatorDisplayId = `User_${scrim.creatorId.substring(0, 6)}`;
-                const creatorColor = isCreator ? 'text-green-400' : 'text-ff-accent';
-
-                // --- Running Scrims (Open/Full) ---
-                if (scrim.status === 'Open' || scrim.status === 'Full') {
-
-                    // Creator-Specific Actions
-                    if (isCreator) {
-                        secondaryActions += `<button onclick="window.openIdPassModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
-                            <span data-lucide="Key" width="18" height="18" class="text-white mr-1"></span> Upload ID/Pass
-                        </button>`;
-                        actionButton = `<button onclick="window.openResultsModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg transition duration-200 shadow-md hover:shadow-lg">
-                            Finish Match & Submit Results
-                        </button>`;
-                    } 
-                    
-                    // Joiner/Creator ID/Pass Viewing
-                    if (isJoined && hasIdPass) {
-                        secondaryActions += `<button onclick="window.openIdPassModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition duration-200 shadow-md">
-                            <span data-lucide="Eye" width="18" height="18" class="text-white mr-1"></span> View ID/Pass
-                        </button>`;
-                    }
-
-
-                    // General Join Actions
-                    if (!isCreator && !isJoined) {
-                        if (!isFull) {
-                            const feeDisplay = scrim.entryFee > 0 ? `${scrim.entryFee} C` : 'FREE';
-                            const feeButtonClass = scrim.entryFee > 0 ? 'bg-ff-accent hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
-
-                            actionButton = `<button onclick="window.openJoinScrimModal('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 ${feeButtonClass} text-white font-bold rounded-lg transition duration-200 shadow-lg">
-                                Join Scrim (${feeDisplay})
-                            </button>`;
-                        } else {
-                            actionButton = `<span class="px-4 py-2 bg-red-800 text-white font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
-                                <span data-lucide="XCircle" width="18" height="18" class="text-white mr-1"></span> Full (Max ${scrim.maxTeams} Teams)
-                            </span>`;
-                        }
-                    } else if (!isCreator && isJoined) {
-                        // Already joined team
-                        const userTeamName = scrim.joiners.find(j => j.id === userId)?.teamName || 'N/A';
-                        actionButton = `<span class="px-4 py-2 bg-gray-700 text-gray-400 font-bold rounded-lg cursor-not-allowed flex items-center justify-center">
-                            <span data-lucide="CheckCircle" width="18" height="18" class="text-green-400 mr-1"></span> Registered as ${userTeamName}
-                        </span>`;
-                    }
-                } 
-                
-                // --- Finished Scrims ---
-                else if (scrim.status === 'Finished') {
-                    if (isCreator) {
-                        secondaryActions += `<button onclick="window.deleteScrimWrapper('${scrim.id}')" class="w-full sm:w-auto mt-2 sm:mt-0 px-4 py-2 bg-gray-800 hover:bg-red-700 text-white font-bold rounded-lg transition duration-200 shadow-lg border border-red-700">
-                            <span data-lucide="XCircle" width="18" height="18" class="text-red-400 mr-1"></span> Delete Record
-                        </button>`;
-                    }
-                    if (scrim.results) {
-                        actionButton = `
-                            <div class="text-left mt-2 p-2 bg-gray-800 rounded-lg">
-                                <p class="text-xs font-bold text-yellow-400">1st: ${scrim.results.first}</p>
-                                <p class="text-xs font-bold text-gray-400">2nd: ${scrim.results.second}</p>
-                                <p class="text-xs font-bold text-red-400">3rd: ${scrim.results.third}</p>
-                            </div>
-                        `;
-                    } else {
-                        actionButton = `<span class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full bg-gray-700 text-gray-400">Results Pending</span>`;
-                    }
-                }
-
-
-                const scrimElement = document.createElement('div');
-                scrimElement.className = 'scrim-item bg-ff-card p-6 rounded-xl flex flex-col justify-between items-stretch mb-4 border-l-4 border-ff-accent';
-                scrimElement.innerHTML = `
-                    <div class="flex-grow">
-                        <div class="flex items-start mb-3 justify-between">
-                            <div class="flex flex-col">
-                                <span class="inline-block px-3 py-1 text-xs font-bold rounded-full ${getStatusClasses(scrim.status)} mr-3 uppercase shadow-md mb-1">${scrim.status}</span>
-                                <h3 class="text-xl font-extrabold text-white">${scrim.title}</h3>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-lg font-extrabold text-green-400">${scrim.prize.toLocaleString()} C</p>
-                                <p class="text-xs text-gray-400">Prize Pool</p>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-400 border-t border-b border-gray-700 py-3 mb-4">
-                            <p><strong>Creator:</strong> <span class="${creatorColor} font-mono">${creatorDisplayId}</span></p>
-                            <p><strong>Entry Fee:</strong> <span class="text-red-400 font-bold">${scrim.entryFee.toLocaleString()} C</span></p>
-                            <p><strong>Map/Mode:</strong> <span class="text-white font-bold">${scrim.mapType || 'N/A'}</span></p>
-                            <p><strong>Teams:</strong> ${scrim.joiners.length} / ${scrim.maxTeams} Teams</p>
-                            <p class="col-span-2"><strong>Team List:</strong> <span class="text-gray-300 text-xs">${scrim.joiners.map(j => j.teamName).join(', ')}</span></p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row justify-end items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                        <div class="flex space-x-2 w-full sm:w-auto justify-end">
-                            ${secondaryActions}
-                        </div>
-                        ${actionButton}
-                    </div>
-                `;
-                container.appendChild(scrimElement);
-                
-                // Re-render Lucide icons for the new scrim element
-                createIcons({
-                    icons: { XCircle, CheckCircle, Key, Eye },
-                    attrs: { width: 18, height: 18, class: 'inline-block' },
-                    elements: scrimElement.querySelectorAll('[data-lucide]')
-                });
-            });
-        };
-
-        // --- Utility Functions for Modal/Messaging ---
-        const showMessage = (text, type = 'info') => {
-            const box = document.getElementById('message-box');
-            box.textContent = text;
-            box.className = 'fixed top-4 right-4 p-4 rounded-lg z-50 transition-transform duration-300 transform shadow-2xl translate-x-0 opacity-100';
-
-            switch (type) {
-                case 'success': box.classList.add('bg-green-600', 'text-white'); break;
-                case 'error': box.classList.add('bg-ff-accent', 'text-white'); break;
-                default: box.classList.add('bg-blue-600', 'text-white');
-            }
-
-            setTimeout(() => {
-                box.classList.remove('translate-x-0', 'opacity-100');
-                box.classList.add('translate-x-full', 'opacity-0');
-                setTimeout(() => box.classList.remove('bg-green-600', 'bg-ff-accent', 'bg-blue-600'), 500); 
-            }, 4000);
-        };
-
-        const showConfirmationModal = (message, onConfirm) => {
-            const modal = document.getElementById('confirmation-modal');
-            const messageEl = document.getElementById('modal-message');
-            const confirmBtn = document.getElementById('modal-confirm-btn');
-
-            messageEl.textContent = message;
-
-            // Recreate the confirm button to clear any previous event listeners
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.onclick = () => {
-                onConfirm();
-                modal.classList.add('hidden');
-            };
-            
-            document.getElementById('modal-cancel-btn').onclick = () => modal.classList.add('hidden');
-
-            modal.classList.remove('hidden');
-        };
-
-        // --- Startup ---
-        window.addEventListener('load', () => {
-             initFirebase();
-             toggleEntryFee(false);
+    pc.ontrack = event => {
+        event.streams[0].getTracks().forEach(track => {
+            remoteStream.addTrack(track);
         });
-    </script>
+    };
 
-    <!-- Main App Content Container (Visible immediately) -->
-    <div id="main-app-content">
+    pc.onicecandidate = event => {
+        if (event.candidate) {
+            db.collection(roomName)
+                .doc("candidates")
+                .collection("all")
+                .add(event.candidate.toJSON());
+        }
+    };
 
-        <!-- Sidebar Menu -->
-        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-40 hidden" onclick="toggleMenu()"></div>
-        <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-900 z-50 shadow-2xl transform -translate-x-full p-6 flex flex-col border-r-4 border-ff-accent">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-black text-ff-accent uppercase">Menu</h2>
-                <button onclick="toggleMenu()" class="text-white hover:text-ff-accent p-2 rounded-full transition duration-150">
-                    <span data-lucide="X"></span>
-                </button>
-            </div>
+    // Create offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-            <!-- Wallet Section - Clickable -->
-            <div class="p-4 bg-ff-card rounded-xl shadow-inner border border-gray-700 mb-6 cursor-pointer" onclick="openWalletModal()">
-                <p class="text-sm text-gray-400 flex items-center mb-1">
-                    <span data-lucide="Wallet" class="text-green-400 mr-2"></span> Current Balance
-                </p>
-                <span id="wallet-balance" class="text-3xl font-extrabold text-green-400 transition-colors duration-500">0</span>
-                <span class="ml-1 text-sm text-gray-400">CREDITS (C)</span>
-                <button class="text-xs text-ff-accent font-bold mt-2 block hover:underline">Manage Funds</button>
-            </div>
+    await db.collection(roomName)
+        .doc("offer")
+        .set({
+            type: "offer",
+            sdp: offer.sdp
+        });
 
-            <!-- Menu Navigation -->
-            <nav class="flex-grow space-y-2">
-                <button onclick="setViewMode('running')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
-                    <span data-lucide="Swords" class="text-ff-accent"></span> Running Scrims
-                </button>
-                <button onclick="setViewMode('finished')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
-                    <span data-lucide="ListChecks" class="text-ff-accent"></span> Finished Scrims
-                </button>
-                <button onclick="setViewMode('about')" class="w-full text-left p-3 rounded-lg hover:bg-gray-800 text-white flex items-center transition duration-150 text-lg hover:border-l-4 border-ff-accent">
-                    <span data-lucide="Info" class="text-ff-accent"></span> About Platform
-                </button>
-            </nav>
-            
-            <!-- Status Footer -->
-            <div class="mt-auto pt-4 border-t border-gray-700">
-                <p class="text-xs text-gray-500" id="app-status">Status: Initializing...</p>
-                <p class="text-xs text-gray-500 break-all">OP ID (User ID): <span id="current-user-id" class="text-gray-300 font-mono text-xs">Loading...</span></p>
-            </div>
-        </div>
+    // Wait for answer
+    db.collection(roomName)
+        .doc("answer")
+        .onSnapshot(async snapshot => {
+            if (snapshot.exists) {
+                let answer = snapshot.data();
+                if (!pc.currentRemoteDescription) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                }
+            }
+        });
 
+    // ICE candidates
+    db.collection(roomName)
+        .doc("candidates")
+        .collection("all")
+        .onSnapshot(snapshot => {
+            snapshot.docChanges().forEach(change => {
+                if (change.type === "added") {
+                    let data = change.doc.data();
+                    pc.addIceCandidate(new RTCIceCandidate(data));
+                }
+            });
+        });
+}
 
-        <!-- Header Section -->
-        <header class="mb-8 p-6 bg-ff-card rounded-xl shadow-2xl border-b-4 border-ff-accent flex justify-between items-center">
-            <h1 class="text-4xl sm:text-5xl font-black text-ff-accent uppercase">SCRIM COMMAND</h1>
-            <button onclick="toggleMenu()" class="p-3 rounded-full bg-gray-800 text-white hover:bg-ff-accent transition duration-200 shadow-lg transform hover:scale-105">
-                <span data-lucide="Menu"></span>
-            </button>
-        </header>
+//////////////////////////////////////////////////////////////
+// CONTROLS
+//////////////////////////////////////////////////////////////
+function toggleMic() {
+    micEnabled = !micEnabled;
+    localStream.getAudioTracks()[0].enabled = micEnabled;
+}
 
-        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Control Panel Column -->
-            <div class="lg:col-span-1 space-y-8 h-fit">
-                
-                <!-- Scrim Creation Panel -->
-                <section class="form-panel bg-ff-card p-6 rounded-xl shadow-2xl border border-ff-accent">
-                    <h2 class="text-3xl font-bold mb-6 flex items-center text-white border-b border-ff-accent pb-2">
-                        <span data-lucide="PlusCircle" class="text-ff-accent"></span> Deploy Scrim
-                    </h2>
-                    <form id="create-scrim-form" onsubmit="window.createScrim(event)" class="space-y-4">
-                        <div>
-                            <label for="scrim-title" class="block text-sm font-medium text-gray-300">Match Title</label>
-                            <input type="text" id="scrim-title" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                        </div>
-                        
-                        <!-- NEW: Map Type and Max Teams -->
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="scrim-map-type" class="block text-sm font-medium text-gray-300">Map Type</label>
-                                <select id="scrim-map-type" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-ff-accent focus:border-ff-accent">
-                                    <option value="FullMap">Full Map (BR)</option>
-                                    <option value="ClashSquad">Clash Squad (CS)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="scrim-max-teams" class="block text-sm font-medium text-gray-300">Max Teams (Slots)</label>
-                                <select id="scrim-max-teams" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-ff-accent focus:border-ff-accent">
-                                    <option value="4">4 Teams</option>
-                                    <option value="8" selected>8 Teams</option>
-                                    <option value="12">12 Teams</option>
-                                    <option value="16">16 Teams</option>
-                                </select>
-                            </div>
-                        </div>
+function toggleCam() {
+    camEnabled = !camEnabled;
+    localStream.getVideoTracks()[0].enabled = camEnabled;
+}
 
-                        <!-- Free/Paid Toggle -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-300 mb-1">Entry Type</label>
-                            <div class="flex space-x-4">
-                                <label class="inline-flex items-center text-white">
-                                    <input type="radio" name="entry-type" value="paid" checked onclick="toggleEntryFee(false)" class="form-radio text-ff-accent bg-gray-700 border-gray-600 focus:ring-ff-accent">
-                                    <span class="ml-2">Paid Scrim</span>
-                                </label>
-                                <label class="inline-flex items-center text-white">
-                                    <input type="radio" name="entry-type" value="free" onclick="toggleEntryFee(true)" class="form-radio text-ff-accent bg-gray-700 border-gray-600 focus:ring-ff-accent">
-                                    <span class="ml-2">Free Scrim</span>
-                                </label>
-                            </div>
-                        </div>
+async function startScreen() {
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+    });
 
-                        <div>
-                            <label for="scrim-entry" id="scrim-entry-label" class="block text-sm font-medium text-gray-300">Entry Fee (C)</label>
-                            <input type="number" id="scrim-entry" required min="0" value="100" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                        </div>
-                        <div>
-                            <label for="scrim-prize" class="block text-sm font-medium text-gray-300">Winning Prize (C)</label>
-                            <input type="number" id="scrim-prize" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                        </div>
-                        <button type="submit" class="w-full bg-ff-accent hover:bg-red-700 text-gray-900 font-extrabold py-3 rounded-xl transition duration-200 shadow-lg hover:shadow-xl uppercase text-lg transform hover:scale-[1.01]">
-                            <span data-lucide="Swords" class="text-gray-900"></span> Launch Match
-                        </button>
-                    </form>
-                </section>
-                
-            </div>
+    const screenTrack = screenStream.getTracks()[0];
 
+    const sender = pc.getSenders().find(s => s.track.kind === "video");
+    sender.replaceTrack(screenTrack);
 
-            <!-- Dynamic Content Panel (Right/Bottom) -->
-            <section class="lg:col-span-2">
-                <h2 id="main-content-title" class="text-3xl font-bold mb-4 flex items-center text-white border-b border-ff-accent pb-2 uppercase">
-                    <span data-lucide="Swords" class="text-ff-accent"></span> Active Missions (Open/Full Only)
-                </h2>
-                
-                <!-- Loading Indicator (New) -->
-                <div id="loading-indicator" class="bg-ff-card p-12 rounded-xl shadow-xl space-y-4 flex flex-col items-center justify-center border border-gray-700 hidden">
-                    <div class="spinner"></div>
-                    <p class="text-lg text-gray-400 mt-4">Loading real-time data from server...</p>
-                </div>
-                
-                <!-- Scrim List View -->
-                <div id="scrim-list-container" class="scrim-list-container">
-                    <div id="scrim-list" class="space-y-4">
-                        <!-- Scrims will be rendered here -->
-                    </div>
-                </div>
-
-                <!-- About Section View -->
-                <div id="about-section" class="bg-ff-card p-6 rounded-xl shadow-xl space-y-4 hidden border border-gray-700">
-                    <h3 class="text-2xl font-bold text-ff-accent mb-3 flex items-center"><span data-lucide="Users" class="text-ff-accent"></span> Platform Overview</h3>
-                    <ul class="list-disc list-inside text-gray-400 space-y-2">
-                        <li>**Persistence:** Scrims and Wallets are saved across sessions using Firestore.</li>
-                        <li>**Economy:** New users start with **0 Credits (C)**. To start playing paid scrims, use the **Deposit Credits** tab in the Wallet Menu.</li>
-                        <li>**Identifier:** Your unique player ID is the **OP ID** in the status footer.</li>
-                        <li>**Match Flow:** The creator uploads **ID/Pass** (only visible to joined teams), runs the match, submits the **1st, 2nd, and 3rd place team names**, and the system automatically distributes the prize pool.</li>
-                    </ul>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Custom Notification/Message Box (No alert) -->
-    <div id="message-box" class="fixed top-4 right-4 p-4 rounded-lg z-50 transition-transform duration-300 transform translate-x-full opacity-0 shadow-2xl" role="alert">
-        <!-- Message content here -->
-    </div>
-
-    <!-- Confirmation Modal (No window.confirm) -->
-    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
-        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-sm w-full border border-red-700">
-            <h3 class="text-2xl font-bold mb-4 text-red-500 uppercase">Warning: System Override</h3>
-            <p id="modal-message" class="text-gray-300 mb-6"></p>
-            <div class="flex justify-end space-x-4">
-                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition duration-200">
-                    Cancel
-                </button>
-                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 transition duration-200 uppercase">
-                    Proceed
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Wallet Management Modal -->
-    <div id="wallet-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] hidden">
-        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-ff-accent">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                <h3 class="text-3xl font-black text-white uppercase flex items-center">
-                    <span data-lucide="Wallet" class="text-ff-accent mr-2"></span> Manage Wallet
-                </h3>
-                <button onclick="closeWalletModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
-                    <span data-lucide="XCircle" width="24" height="24"></span>
-                </button>
-            </div>
-
-            <p class="text-lg text-gray-300 mb-6">Current Balance: <span id="modal-current-balance" class="font-extrabold text-green-400">0 C</span></p>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Deposit Panel -->
-                <div class="p-4 bg-gray-900 rounded-lg border border-green-500/50">
-                    <h4 class="text-xl font-bold text-green-400 mb-3">Deposit Credits (Simulated)</h4>
-                    <form id="deposit-form" onsubmit="window.handleDeposit(event)" class="space-y-3">
-                        <div>
-                            <label for="deposit-amount" class="block text-sm font-medium text-gray-400">Amount (C)</label>
-                            <input type="number" id="deposit-amount" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-green-500 focus:border-green-500">
-                        </div>
-                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition duration-200 uppercase text-sm">
-                            Deposit
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Withdraw Panel -->
-                <div class="p-4 bg-gray-900 rounded-lg border border-red-500/50">
-                    <h4 class="text-xl font-bold text-red-400 mb-3">Withdraw Credits (Simulated)</h4>
-                    <form id="withdraw-form" onsubmit="window.handleWithdraw(event)" class="space-y-3">
-                        <div>
-                            <label for="withdraw-amount" class="block text-sm font-medium text-gray-400">Amount (C)</label>
-                            <input type="number" id="withdraw-amount" required min="100" value="500" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600 focus:ring-red-500 focus:border-red-500">
-                        </div>
-                        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition duration-200 uppercase text-sm">
-                            Withdraw
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <p class="text-xs text-gray-500 mt-6 pt-4 border-t border-gray-800">Note: Transactions here are simulated and affect your in-app credit balance only. Minimum transaction amount is 100 C.</p>
-        </div>
-    </div>
-
-    <!-- Join Scrim Modal (Team Name Input) -->
-    <div id="join-scrim-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
-        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-sm w-full border-t-4 border-ff-accent">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                <h3 class="text-2xl font-black text-white uppercase">Register Team</h3>
-                <button onclick="closeJoinScrimModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
-                    <span data-lucide="XCircle" width="24" height="24"></span>
-                </button>
-            </div>
-            <h4 id="join-scrim-title" class="text-xl font-bold text-ff-accent mb-2"></h4>
-            <p class="text-gray-400 mb-4">Entry Fee: <span id="join-scrim-fee" class="font-bold text-red-400"></span></p>
-
-            <form id="join-scrim-form" class="space-y-4">
-                <div>
-                    <label for="join-team-name" class="block text-sm font-medium text-gray-300">Your Team Name</label>
-                    <input type="text" id="join-team-name" required minlength="3" maxlength="15" placeholder="e.g. Shadow Squad" class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                    <p class="text-xs text-gray-500 mt-1">This name identifies your team for results and prizes.</p>
-                </div>
-                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 rounded-lg transition duration-200 uppercase">
-                    Confirm Registration
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- ID/Pass Modal (Upload/View) -->
-    <div id="id-pass-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
-        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-md w-full border-t-4 border-blue-600">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                <h3 id="id-pass-title" class="text-2xl font-black text-white uppercase flex items-center">
-                    <span data-lucide="Key" class="text-blue-500 mr-2"></span> Credentials
-                </h3>
-                <button onclick="closeIdPassModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
-                    <span data-lucide="XCircle" width="24" height="24"></span>
-                </button>
-            </div>
-            
-            <!-- Creator Upload Form -->
-            <form id="id-pass-form" class="space-y-4 hidden">
-                <div>
-                    <label for="scrim-room-id" class="block text-sm font-medium text-gray-300">Room ID</label>
-                    <input type="text" id="scrim-room-id" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                </div>
-                <div>
-                    <label for="scrim-room-pass" class="block text-sm font-medium text-gray-300">Password</label>
-                    <input type="text" id="scrim-room-pass" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-lg transition duration-200 uppercase">
-                    Save Credentials
-                </button>
-            </form>
-
-            <!-- Joiner Display View -->
-            <div id="id-pass-display" class="space-y-4 hidden">
-                <div class="p-4 bg-gray-900 rounded-lg border border-blue-500">
-                    <p class="text-sm text-gray-400">Room ID:</p>
-                    <p id="display-room-id" class="text-2xl font-extrabold text-blue-400"></p>
-                </div>
-                <div class="p-4 bg-gray-900 rounded-lg border border-blue-500">
-                    <p class="text-sm text-gray-400">Password:</p>
-                    <p id="display-room-pass" class="text-2xl font-extrabold text-blue-400"></p>
-                </div>
-                <p class="text-xs text-red-400 mt-4">Do not share these credentials with non-registered players.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Results Modal (Winner Selection) -->
-    <div id="results-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] hidden">
-        <div class="bg-ff-card p-8 rounded-xl shadow-2xl max-w-lg w-full border-t-4 border-yellow-500">
-            <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
-                <h3 class="text-2xl font-black text-white uppercase flex items-center">
-                    <span data-lucide="ListChecks" class="text-yellow-500 mr-2"></span> Submit Results
-                </h3>
-                <button onclick="closeResultsModal()" class="text-gray-400 hover:text-white p-1 rounded-full transition duration-150">
-                    <span data-lucide="XCircle" width="24" height="24"></span>
-                </button>
-            </div>
-            
-            <h4 id="results-scrim-title" class="text-xl font-bold text-yellow-400 mb-4"></h4>
-            <p class="text-sm text-gray-400 mb-6">Select the winning teams for 1st, 2nd, and 3rd place. Prizes will be distributed automatically.</p>
-
-            <form id="results-form" class="space-y-4">
-                
-                <!-- 1st Place -->
-                <div>
-                    <label for="first-place-team" class="block text-sm font-extrabold text-yellow-500">1st Place (50% Prize)</label>
-                    <select id="first-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
-                        <!-- Options populated by JS -->
-                    </select>
-                </div>
-                
-                <!-- 2nd Place -->
-                <div>
-                    <label for="second-place-team" class="block text-sm font-extrabold text-gray-400">2nd Place (30% Prize)</label>
-                    <select id="second-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
-                        <!-- Options populated by JS -->
-                    </select>
-                </div>
-                
-                <!-- 3rd Place -->
-                <div>
-                    <label for="third-place-team" class="block text-sm font-extrabold text-red-400">3rd Place (20% Prize)</label>
-                    <select id="third-place-team" required class="form-input-field mt-1 block w-full px-3 py-2 rounded-lg text-white shadow-sm bg-gray-800 border-gray-600">
-                        <!-- Options populated by JS -->
-                    </select>
-                </div>
-
-                <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-extrabold py-3 rounded-lg transition duration-200 uppercase">
-                    Distribute Prizes & Finish Scrim
-                </button>
-            </form>
-        </div>
-    </div>
+    screenTrack.onended = () => {
+        sender.replaceTrack(localStream.getVideoTracks()[0]);
+    };
+}
+</script>
 </body>
 </html>
