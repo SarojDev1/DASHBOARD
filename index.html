@@ -1,354 +1,806 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SAROJ PRODUCTION | Video Call</title>
-    <style>
-        body { background:#0d0d0d; color:white; font-family:Arial; text-align:center; }
-        #loginBox { margin-top:50px; }
-        #callBox { display:none; }
+  <meta charset="utf-8" />
+  <title>SAROJ PRODUCTION — Multi Team Video + Screen Share</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --panel: #111;
+      --accent: #7b2cff;
+      --muted-bg: rgba(255,0,0,0.9);
+      --text: #fff;
+    }
+    body { margin:0; font-family:Inter, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:10px 18px; display:flex; align-items:center; gap:12px; background:linear-gradient(90deg,#140018, #1f0033); box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+    header h1 { font-size:18px; margin:0; }
+    main { padding:14px; }
 
-        input { padding:10px; width:250px; border-radius:6px; border:none; margin:6px; }
-        button { padding:10px 20px; background:#7b2cff; border:none; border-radius:6px; color:white; cursor:pointer; }
+    /* Login */
+    #loginCard { max-width:420px; margin:28px auto; background:var(--panel); padding:20px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.6); text-align:center; }
+    input[type="text"], input[type="password"] { width:90%; padding:10px 12px; border-radius:8px; border:1px solid #222; background:#0b0b0b; color:var(--text); margin:8px 0; }
+    button { background:var(--accent); color:white; padding:10px 14px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
 
-        #videos { 
-            display:grid; 
-            grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
-            gap:10px; margin-top:20px;
-        }
+    /* Call UI */
+    #callArea { display:none; max-width:1200px; margin:18px auto; }
 
-        .vbox { 
-            position:relative; 
-            background:#000; 
-            border-radius:6px; 
-        }
+    .layout {
+      display:grid;
+      grid-template-columns: 1fr 360px;
+      gap:12px;
+    }
 
-        video { width:100%; height:auto; border-radius:6px; }
+    /* Big shared screen left area */
+    #stage {
+      background:#000; border-radius:10px; padding:8px; min-height:360px; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; position:relative; overflow:hidden;
+    }
+    #stageVideo { width:100%; height:100%; object-fit:contain; border-radius:8px; background:#000; }
+    #stageTitle { position:absolute; top:10px; left:12px; background:var(--accent); color:white; padding:6px 10px; border-radius:8px; font-weight:700; display:none; z-index:30; }
 
-        .muteIcon {
-            position:absolute;
-            top:5px; left:5px;
-            background:red; color:white;
-            padding:4px 8px;
-            border-radius:4px;
-            display:none;
-            font-size:14px;
-        }
+    /* Right side: small tiles + controls */
+    #sidePanel { background:var(--panel); padding:12px; border-radius:10px; height:100%; display:flex; flex-direction:column; gap:12px; }
+    .controls { display:flex; gap:8px; justify-content:center; }
+    .controls button { flex:1; }
 
-        .shareNotice {
-            position:fixed;
-            top:10px; right:10px;
-            background:#7b2cff; padding:10px 15px;
-            border-radius:6px; z-index:9999;
-        }
-    </style>
+    #grid { display:grid; grid-template-columns: repeat(1,1fr); gap:8px; }
+    @media(min-width:700px){ #grid { grid-template-columns: repeat(2,1fr); } }
+    .tile { background:#000; border-radius:8px; position:relative; overflow:hidden; min-height:140px; display:flex; align-items:center; justify-content:center; }
+    .tile video { width:100%; height:100%; object-fit:cover; display:block; }
+    .tile .label { position:absolute; left:8px; bottom:8px; background:rgba(0,0,0,0.6); padding:6px 8px; border-radius:6px; font-size:13px; }
+    .tile .muted { position:absolute; top:8px; right:8px; background:var(--muted-bg); padding:6px 7px; border-radius:6px; font-weight:700; display:none; }
+
+    /* status banner */
+    .banner { position:fixed; top:12px; right:12px; background:rgba(0,0,0,0.6); color:white; padding:8px 12px; border-radius:10px; z-index:60; display:none; }
+
+    footer { color:#aaa; text-align:center; padding:16px 8px; font-size:13px; }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>SAROJ PRODUCTION PANEL</h1>
+    <div id="roomInfo" style="margin-left:auto; font-size:13px; color:#ccc">Room: <strong id="roomName">production-room</strong></div>
+  </header>
 
-<h1>SAROJ PRODUCTION MULTI MANAGEMENT</h1>
+  <main>
+    <!-- LOGIN -->
+    <div id="loginCard">
+      <h2>Join Production Room</h2>
+      <p style="color:#bbb; margin-top:4px; margin-bottom:12px;">Use same ID/pass for management. Admin: username=admin password=12345</p>
+      <input id="displayName" type="text" placeholder="Your name / team name" />
+      <input id="password" type="password" placeholder="Admin password (optional)" />
+      <div style="margin-top:10px; display:flex; gap:8px; justify-content:center;">
+        <button id="joinBtn">Join Room</button>
+        <button id="leaveBtn" style="display:none; background:#444;">Leave</button>
+      </div>
+      <p id="loginMsg" style="color:#f88; margin-top:8px;"></p>
+    </div>
 
-<div id="loginBox">
-    <input id="username" placeholder="Enter your name"><br>
-    <input id="password" placeholder="Password (12345)" type="password"><br>
-    <button onclick="login()">Join Room</button>
-</div>
+    <!-- CALL AREA -->
+    <div id="callArea">
+      <div class="layout">
+        <!-- Left: Stage (big shared screen or main active speaker) -->
+        <div id="stage">
+          <div id="stageTitle">Shared Screen</div>
+          <video id="stageVideo" autoplay playsinline muted></video>
+        </div>
 
-<div id="callBox">
-    <button onclick="toggleMic()">Mute / Unmute</button>
-    <button onclick="toggleCam()">Camera On / Off</button>
-    <button id="screenBtn" onclick="shareScreen()">Share Screen</button>
+        <!-- Right: Side panel -->
+        <div id="sidePanel">
+          <div class="controls">
+            <button id="muteBtn">Mute</button>
+            <button id="camBtn">Camera Off</button>
+            <button id="shareBtn">Share Screen</button>
+          </div>
 
-    <div id="videos"></div>
-</div>
+          <div style="font-size:13px; color:#bbb; text-align:center;">Participants</div>
+          <div id="grid"></div>
+          <div style="flex:1"></div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+          <div style="font-size:13px; color:#888; text-align:center;">
+            Tip: Use latest Chrome / Edge / Firefox on desktop for screen sharing.
+          </div>
+        </div>
+      </div>
+    </div>
 
-<script>
-/*** FIREBASE CONFIG ***/
-const firebaseConfig = {
-  apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
-  authDomain: "business-bfddf.firebaseapp.com",
-  projectId: "business-bfddf",
-  storageBucket: "business-bfddf.firebasestorage.app",
-  messagingSenderId: "536592740939",
-  appId: "1:536592740939:web:a59d16003542ee3b7b53ce",
-  measurementId: "G-7HJWD72M12"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+    <div class="banner" id="banner"></div>
+  </main>
 
+  <footer> SAROJ PRODUCTION PANEL — WebRTC + Firebase signaling </footer>
 
-/*** GLOBALS ***/
-let localId;
-let localStream;
-let micEnabled = true;
-let camEnabled = true;
-let peers = {};      // userId → RTCPeerConnection
-let remoteBoxes = {}; // userId → HTML video box
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
-const room = "mainRoom12345"; // ALL users join SAME ROOM
+  <script>
+  /*****************************************************************
+   * Complete A → Z single-file production system
+   * - Firestore used for signaling (offers/answers/candidates + presence)
+   * - Many comments to guide / adapt
+   *****************************************************************/
 
+  // --------- CONFIG: update only if needed ----------
+  const ROOM_ID = "production-room"; // fixed room name
+  const MAX_PARTICIPANTS = 8; // we target 5 but can handle more (small-scale)
+  const IS_ADMIN_PASS = "12345"; // admin password as requested
 
-/*** LOGIN ***/
-function login() {
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
+  // Your Firebase config (already provided)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
+    authDomain: "business-bfddf.firebaseapp.com",
+    projectId: "business-bfddf",
+    storageBucket: "business-bfddf.firebasestorage.app",
+    messagingSenderId: "536592740939",
+    appId: "1:536592740939:web:a59d16003542ee3b7b53ce",
+    measurementId: "G-7HJWD72M12"
+  };
 
-    if (!user) return alert("Enter name");
-    if (pass !== "12345") return alert("Wrong password");
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    localId = user + "_" + Date.now();
+  // --------- State ----------
+  const local = {
+    id: null,
+    name: null,
+    pcMap: {},           // remoteId -> RTCPeerConnection
+    remoteVideoEls: {},  // remoteId -> {container, videoEl, mutedBadgeEl}
+    localStream: null,
+    sharing: false,      // are we currently screen-sharing?
+    screenTrack: null
+  };
 
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("callBox").style.display = "block";
+  const ui = {
+    joinBtn: document.getElementById('joinBtn'),
+    leaveBtn: document.getElementById('leaveBtn'),
+    displayName: document.getElementById('displayName'),
+    password: document.getElementById('password'),
+    loginMsg: document.getElementById('loginMsg'),
+    callArea: document.getElementById('callArea'),
+    loginCard: document.getElementById('loginCard'),
+    grid: document.getElementById('grid'),
+    stageVideo: document.getElementById('stageVideo'),
+    stageTitle: document.getElementById('stageTitle'),
+    banner: document.getElementById('banner'),
+    muteBtn: document.getElementById('muteBtn'),
+    camBtn: document.getElementById('camBtn'),
+    shareBtn: document.getElementById('shareBtn'),
+    leaveBtn: document.getElementById('leaveBtn')
+  };
 
-    startCall();
-}
+  document.getElementById('roomName').innerText = ROOM_ID;
 
+  // Disable Share Screen button on unsupported browsers (graceful)
+  function updateShareBtnSupport() {
+    const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+    ui.shareBtn.disabled = !supported;
+    ui.shareBtn.innerText = supported ? "Share Screen" : "Share Not Supported";
+  }
+  updateShareBtnSupport();
 
-/*** START CALL ***/
-async function startCall() {
-    localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: true
+  // Helper: show temporary banner
+  function showBanner(text, timeout = 3000) {
+    ui.banner.innerText = text;
+    ui.banner.style.display = 'block';
+    setTimeout(()=> ui.banner.style.display = 'none', timeout);
+  }
+
+  // Helper: create unique local id
+  function makeLocalId(name) {
+    return `${name.replace(/\s+/g,'_').substring(0,20)}_${Date.now()}`;
+  }
+
+  // ---------- Firestore path helpers ----------
+  function membersCol() { return db.collection("rooms").doc(ROOM_ID).collection("members"); }
+  function offersCol()  { return db.collection("rooms").doc(ROOM_ID).collection("offers"); }
+  function answersCol() { return db.collection("rooms").doc(ROOM_ID).collection("answers"); }
+  function candidatesCol(pairId) { return db.collection("rooms").doc(ROOM_ID).collection("candidates").doc(pairId).collection("items"); }
+
+  // ---------- Presence: add / remove member docs ----------
+  async function publishPresence() {
+    const docRef = membersCol().doc(local.id);
+    await docRef.set({
+      name: local.name,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sharing: false,
+      muted: false
+    }, {merge:true});
+    // cleanup on disconnect (not perfect on GitHub Pages, but we attempt)
+    // Firestore doesn't have onDisconnect; we'll remove the doc on window unload
+  }
+
+  async function clearPresence() {
+    try { await membersCol().doc(local.id).delete(); } catch(e){}
+  }
+
+  // Listen to members and update grid
+  let membersUnsub = null;
+  function startMembersListener() {
+    membersUnsub = membersCol().onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        const id = change.doc.id;
+        const data = change.doc.data();
+        if (change.type === "added") {
+          if (id === local.id) return; // skip self
+          createRemoteTile(id, data.name, data);
+          // existing peers will be handled by offer/answer flow
+        } else if (change.type === "modified") {
+          // update sharing or mute state
+          updateRemoteState(id, data);
+        } else if (change.type === "removed") {
+          removeRemote(id);
+        }
+      });
     });
+  }
 
-    addVideoBox(localId, localStream, true);
+  // ---------- UI remote tiles ----------
+  function createRemoteTile(remoteId, label, data) {
+    if (local.remoteVideoEls[remoteId]) return;
+    // create container
+    const container = document.createElement('div');
+    container.className = 'tile videoContainer';
+    container.id = 'tile_'+remoteId;
 
-    db.collection(room).doc(localId).set({ id: localId, live: true });
-
-    listenForUsers();
-    listenForOffers();
-    listenForAnswers();
-    listenForCandidates();
-}
-
-
-/*** ADD VIDEO BOX ***/
-function addVideoBox(id, stream, isLocal = false) {
-    if (remoteBoxes[id]) remoteBoxes[id].remove();
-
-    const box = document.createElement("div");
-    box.className = "vbox";
-
-    const video = document.createElement("video");
+    const video = document.createElement('video');
     video.autoplay = true;
     video.playsInline = true;
-    video.srcObject = stream;
-    if (isLocal) video.muted = true;
+    video.id = 'video_'+remoteId;
+    container.appendChild(video);
 
-    const muteIcon = document.createElement("div");
-    muteIcon.className = "muteIcon";
-    muteIcon.innerText = "MUTED";
+    const nameLbl = document.createElement('div');
+    nameLbl.className = 'label';
+    nameLbl.innerText = label || remoteId;
+    container.appendChild(nameLbl);
 
-    box.appendChild(video);
-    box.appendChild(muteIcon);
+    const mutedBadge = document.createElement('div');
+    mutedBadge.className = 'muted';
+    mutedBadge.innerText = 'MUTED';
+    container.appendChild(mutedBadge);
 
-    document.getElementById("videos").appendChild(box);
+    // append to grid
+    ui.grid.appendChild(container);
+    local.remoteVideoEls[remoteId] = { container, video, mutedBadge, label };
+  }
 
-    remoteBoxes[id] = box;
-}
+  function updateRemoteState(remoteId, data) {
+    const entry = local.remoteVideoEls[remoteId];
+    if (!entry) return;
+    // show/hide muted badge
+    if (data.muted) entry.mutedBadge.style.display = 'block'; else entry.mutedBadge.style.display = 'none';
+    // if user is sharing, put their stream into stage
+    if (data.sharing) {
+      // move their video stream to the stage
+      ui.stageTitle.style.display = 'block';
+      ui.stageTitle.innerText = data.name + " is sharing";
+      // set stage video srcObject to the remote's video element srcObject
+      ui.stageVideo.srcObject = entry.video.srcObject;
+      ui.stageVideo.muted = false;
+      ui.stageVideo.play().catch(()=>{});
+    } else {
+      // if no one sharing, hide stage title and revert to "no share"
+      // we'll check all members to see if someone still shares
+      // if none, clear stage
+      checkIfAnySharing();
+    }
+  }
 
+  async function checkIfAnySharing() {
+    // find any member doc with sharing==true
+    const snap = await membersCol().where('sharing', '==', true).get();
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      // ensure stage shows that user's video (updateRemoteState will handle)
+      // nothing else here
+    } else {
+      ui.stageTitle.style.display = 'none';
+      ui.stageVideo.srcObject = null;
+    }
+  }
 
-/*** REMOVE USER BOX WHEN LEAVE ***/
-db.collection(room).onSnapshot(snap => {
-    snap.docChanges().forEach(change => {
-        if (change.type === "removed") {
-            const uid = change.doc.id;
-            if (remoteBoxes[uid]) {
-                remoteBoxes[uid].remove();
-                delete remoteBoxes[uid];
-            }
-            if (peers[uid]) {
-                peers[uid].close();
-                delete peers[uid];
-            }
-        }
-    });
-});
+  function removeRemote(remoteId) {
+    // close pc if exists
+    const pc = local.pcMap[remoteId];
+    if (pc) {
+      try { pc.close(); } catch(e){}
+      delete local.pcMap[remoteId];
+    }
+    // remove element
+    const entry = local.remoteVideoEls[remoteId];
+    if (entry) {
+      try { entry.container.remove(); } catch(e){}
+      delete local.remoteVideoEls[remoteId];
+    }
+    // if stage was showing that user's share, clear it
+    checkIfAnySharing();
+  }
 
+  // ---------- Signaling: create offer to a remote peer  ----------
+  async function createOfferTo(remoteId) {
+    console.log('Creating offer to', remoteId);
+    const pc = makePeerConnection(remoteId);
+    local.pcMap[remoteId] = pc;
 
-/*** LISTEN USERS JOINING ***/
-function listenForUsers() {
-    db.collection(room).onSnapshot(snap => {
-        snap.forEach(doc => {
-            const uid = doc.data().id;
-            if (uid !== localId && !peers[uid]) {
-                createPeer(uid);
-                sendOffer(uid);
-            }
-        });
-    });
-}
+    // add local tracks
+    local.localStream.getTracks().forEach(track => pc.addTrack(track, local.localStream));
 
-
-/*** CREATE PEER ***/
-function createPeer(uid) {
-    const pc = new RTCPeerConnection({
-        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
-    });
-
-    peers[uid] = pc;
-
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-    pc.ontrack = (e) => {
-        addVideoBox(uid, e.streams[0]);
-    };
-
-    pc.onicecandidate = (e) => {
-        if (e.candidate) {
-            db.collection(room).doc(localId + "_ice_" + uid).set({
-                from: localId,
-                to: uid,
-                candidate: e.candidate.toJSON()
-            });
-        }
-    };
-}
-
-
-/*** SEND OFFER ***/
-async function sendOffer(uid) {
-    const pc = peers[uid];
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    db.collection(room).doc(localId + "_offer_" + uid).set({
-        from: localId,
-        to: uid,
-        sdp: offer.sdp
+    // store offer in Firestore: doc id = `${localId}_${remoteId}_offer`
+    const pairId = `${local.id}_${remoteId}`;
+    await offersCol().doc(pairId).set({
+      from: local.id,
+      to: remoteId,
+      sdp: offer.sdp,
+      type: 'offer',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
-}
 
-
-/*** LISTEN FOR OFFERS ***/
-function listenForOffers() {
-    db.collection(room).where("to", "==", localId).onSnapshot(snap => {
-        snap.docChanges().forEach(async change => {
-            if (change.type === "added" && change.doc.id.includes("_offer_")) {
-                const data = change.doc.data();
-                const from = data.from;
-
-                if (!peers[from]) createPeer(from);
-
-                await peers[from].setRemoteDescription({
-                    type: "offer",
-                    sdp: data.sdp
-                });
-
-                const answer = await peers[from].createAnswer();
-                await peers[from].setLocalDescription(answer);
-
-                db.collection(room).doc(localId + "_answer_" + from).set({
-                    from: localId,
-                    to: from,
-                    sdp: answer.sdp
-                });
-            }
-        });
+    // listen for answer
+    answersCol().doc(pairId).onSnapshot(async snap => {
+      if (snap.exists && snap.data().sdp) {
+        const ans = snap.data();
+        if (!pc.currentRemoteDescription) {
+          await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: ans.sdp }));
+        }
+      }
     });
-}
 
-
-/*** LISTEN FOR ANSWERS ***/
-function listenForAnswers() {
-    db.collection(room).where("to", "==", localId).onSnapshot(snap => {
-        snap.docChanges().forEach(async change => {
-            if (change.type === "added" && change.doc.id.includes("_answer_")) {
-                const data = change.doc.data();
-                const from = data.from;
-
-                await peers[from].setRemoteDescription({
-                    type: "answer",
-                    sdp: data.sdp
-                });
-            }
-        });
+    // listen for remote ICE candidates added to candidates collection by remote peer
+    const candidateSub = candidatesCol(pairId).onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const cand = change.doc.data();
+          if (cand && cand.candidate) {
+            pc.addIceCandidate(new RTCIceCandidate(cand.candidate)).catch(e => console.warn('addIce failed', e));
+          }
+        }
+      });
     });
-}
 
+    // store cleanup handle
+    pc._firestoreCandidatesSub = candidateSub;
+  }
 
-/*** LISTEN FOR ICE CANDIDATES ***/
-function listenForCandidates() {
-    db.collection(room).where("to", "==", localId).onSnapshot(snap => {
-        snap.docChanges().forEach(async change => {
-            if (change.type === "added" && change.doc.id.includes("_ice_")) {
-                const data = change.doc.data();
-                const from = data.from;
+  // ---------- Listen for incoming offers (we are callee) ----------
+  let offersUnsub = null;
+  function startOffersListener() {
+    offersUnsub = offersCol().onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(async change => {
+        const docId = change.doc.id;
+        const data = change.doc.data();
+        // only react to offers targeted to me
+        if (data && data.to === local.id && change.type === 'added') {
+          const fromId = data.from;
+          // if we already have a PC to fromId, skip
+          if (!local.pcMap[fromId]) {
+            // create pc and set remote description (offer), then create answer
+            const pc = makePeerConnection(fromId);
+            local.pcMap[fromId] = pc;
 
-                if (peers[from]) {
-                    await peers[from].addIceCandidate(data.candidate);
-                }
-            }
-        });
-    });
-}
+            // add local tracks to pc
+            local.localStream.getTracks().forEach(track => pc.addTrack(track, local.localStream));
 
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
 
-/*** MUTE MIC ***/
-function toggleMic() {
-    micEnabled = !micEnabled;
-    localStream.getAudioTracks()[0].enabled = micEnabled;
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
 
-    remoteBoxes[localId].querySelector(".muteIcon").style.display =
-        micEnabled ? "none" : "block";
-}
-
-
-/*** CAMERA ON/OFF ***/
-function toggleCam() {
-    camEnabled = !camEnabled;
-    localStream.getVideoTracks()[0].enabled = camEnabled;
-}
-
-
-/*** SCREEN SHARE ***/
-async function shareScreen() {
-    if (!navigator.mediaDevices.getDisplayMedia) {
-        return alert("Screen share only works on PC Chrome/Edge/Firefox.");
-    }
-
-    try {
-        const screen = await navigator.mediaDevices.getDisplayMedia({
-            video: true
-        });
-
-        showShareNotice("You are sharing your screen");
-
-        const track = screen.getTracks()[0];
-
-        Object.values(peers).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track.kind === "video");
-            sender.replaceTrack(track);
-        });
-
-        remoteBoxes[localId].querySelector("video").srcObject = screen;
-
-        track.onended = () => {
-            Object.values(peers).forEach(pc => {
-                const sender = pc.getSenders().find(s => s.track.kind === "video");
-                sender.replaceTrack(localStream.getVideoTracks()[0]);
+            // store answer doc under same pairId: `${from}_${to}`
+            const pairId = `${fromId}_${local.id}`;
+            await answersCol().doc(pairId).set({
+              from: local.id,
+              to: fromId,
+              sdp: answer.sdp,
+              type: 'answer',
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            remoteBoxes[localId].querySelector("video").srcObject = localStream;
-        };
+            // listen for remote ICE candidates posted by offerer
+            const candidateSub = candidatesCol(pairId).onSnapshot(snapshot2=>{
+              snapshot2.docChanges().forEach(change2=>{
+                if (change2.type === 'added') {
+                  const cand = change2.doc.data();
+                  if (cand && cand.candidate) {
+                    pc.addIceCandidate(new RTCIceCandidate(cand.candidate)).catch(e=>console.warn('addIce failed', e));
+                  }
+                }
+              });
+            });
+            pc._firestoreCandidatesSub = candidateSub;
+          }
+        }
+      });
+    });
+  }
 
-    } catch (e) {
-        alert("Screen share failed: " + e);
+  // ---------- Peer connection factory ----------
+  function makePeerConnection(remoteId) {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+        // Add TURN servers here for production reliability
+      ]
+    });
+
+    // When remote adds track, attach to remote video element
+    pc.ontrack = (event) => {
+      // event.streams[0] is the remote stream
+      const remoteStream = event.streams && event.streams[0];
+      if (!remoteStream) return;
+      let entry = local.remoteVideoEls[remoteId];
+      if (!entry) {
+        // create tile if not existing (someone may have joined but we haven't yet created their tile)
+        createRemoteTile(remoteId, remoteId, {});
+        entry = local.remoteVideoEls[remoteId];
+      }
+      // attach stream
+      entry.video.srcObject = remoteStream;
+
+      // If remote currently sharing, place them on stage handled by members listener updateRemoteState
+    };
+
+    // When ICE candidate generated locally, push to candidates collection for this pair
+    pc.onicecandidate = async event => {
+      if (event.candidate) {
+        // pair id depends who created the offer. We will write candidates under pairId = `${creator}_${callee}`
+        // find correct pairId: if local created offer, pairId = `${local.id}_${remoteId}`; else `${remoteId}_${local.id}`
+        // To be safe, write to both possible candidate collections so the other side can pick them up
+        const pair1 = `${local.id}_${remoteId}`;
+        const pair2 = `${remoteId}_${local.id}`;
+        // Attempt write to pair1
+        try {
+          await candidatesCol(pair1).add({ candidate: event.candidate.toJSON(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        } catch(e) {}
+        try {
+          await candidatesCol(pair2).add({ candidate: event.candidate.toJSON(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        } catch(e) {}
+      }
+    };
+
+    // Track connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log('pc', remoteId, 'state', pc.connectionState);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed' || pc.connectionState === 'disconnected') {
+        // cleanup
+      }
+    };
+
+    return pc;
+  }
+
+  // ---------- Create our local media and start presence + listeners ----------
+  async function startLocalMediaAndSignaling() {
+    // request camera + mic with preference for high quality on desktop
+    const constraints = {
+      audio: true,
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+    };
+    try {
+      local.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(err) {
+      ui.loginMsg.innerText = "Camera/Mic permission denied or not available: " + err;
+      throw err;
     }
-}
 
+    // show local in a tile as well
+    createLocalTile();
 
-/*** SHOW NOTIFICATION ***/
-function showShareNotice(msg) {
-    const d = document.createElement("div");
-    d.className = "shareNotice";
-    d.innerText = msg;
-    document.body.appendChild(d);
-    setTimeout(() => d.remove(), 3000);
-}
-</script>
+    // publish presence
+    await publishPresence();
 
+    // start listening to offers and members
+    startOffersListener();
+    startMembersListener();
+    // also listen for answers (some flows create offers before we set up)
+    startExistingMembersAndOffers();
+
+    // Put stage default to local preview until someone shares
+    ui.stageVideo.srcObject = local.localStream;
+    ui.stageVideo.muted = true;
+  }
+
+  // Create local tile in grid
+  function createLocalTile() {
+    // local tile: use same markup as remote tiles but indicate "(You)"
+    const container = document.createElement('div');
+    container.className = 'tile videoContainer';
+    container.id = 'tile_local';
+
+    const video = document.createElement('video');
+    video.autoplay = true; video.playsInline = true; video.muted = true;
+    video.srcObject = local.localStream;
+    container.appendChild(video);
+
+    const nameLbl = document.createElement('div');
+    nameLbl.className = 'label';
+    nameLbl.innerText = local.name + " (You)";
+    container.appendChild(nameLbl);
+
+    const mutedBadge = document.createElement('div');
+    mutedBadge.className = 'muted'; mutedBadge.innerText = 'MUTED';
+    container.appendChild(mutedBadge);
+
+    ui.grid.prepend(container); // show local first
+    local.remoteVideoEls['local'] = { container, video, mutedBadge, label: local.name };
+  }
+
+  // ---------- When joining, create offers to existing members ----------
+  async function startExistingMembersAndOffers() {
+    // fetch current members and create offers to them
+    const membersSnap = await membersCol().get();
+    membersSnap.forEach(doc => {
+      const id = doc.id;
+      if (id === local.id) return;
+      // create offer to existing member
+      if (!local.pcMap[id]) {
+        // create an "offer" from us to them
+        createOfferTo(id).catch(e => console.error('offer->', e));
+      }
+    });
+  }
+
+  // ---------- Join flow ----------
+  ui.joinBtn.addEventListener('click', async () => {
+    const name = ui.displayName.value.trim();
+    const pass = ui.password.value;
+    ui.loginMsg.innerText = '';
+    if (!name) { ui.loginMsg.innerText = 'Enter a display name'; return; }
+    // admin check (optional)
+    if (name === 'admin' && pass !== IS_ADMIN_PASS) {
+      ui.loginMsg.innerText = 'Wrong admin password';
+      return;
+    }
+    ui.joinBtn.disabled = true;
+    try {
+      local.name = name;
+      local.id = makeLocalId(name);
+      // start local media + signaling
+      await startLocalMediaAndSignaling();
+      // add self to members (presence)
+      await publishPresence();
+      // write a member doc (already done in publishPresence)
+      ui.loginCard.style.display = 'none';
+      ui.callArea.style.display = 'block';
+      ui.leaveBtn.style.display = 'inline-block';
+      showBanner('Joined room as ' + local.name, 2500);
+    } catch(err) {
+      console.error(err);
+      ui.loginMsg.innerText = 'Could not start media: ' + err;
+      ui.joinBtn.disabled = false;
+    }
+  });
+
+  // ---------- Leave flow ----------
+  ui.leaveBtn.addEventListener('click', async () => {
+    await leaveRoom();
+    location.reload();
+  });
+
+  async function leaveRoom() {
+    // delete presence doc
+    try { await clearPresence(); } catch(e){}
+    // close peer connections
+    Object.values(local.pcMap).forEach(pc => {
+      try { pc.close(); } catch(e){}
+    });
+    local.pcMap = {};
+    // stop tracks
+    if (local.localStream) {
+      local.localStream.getTracks().forEach(t => t.stop());
+    }
+    // cleanup UI
+    ui.callArea.style.display = 'none';
+    ui.loginCard.style.display = 'block';
+  }
+
+  // ---------- Toggle mic / camera ----------
+  ui.muteBtn.addEventListener('click', toggleMic);
+  ui.camBtn.addEventListener('click', toggleCam);
+
+  function toggleMic() {
+    if (!local.localStream) return;
+    const track = local.localStream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    const muted = !track.enabled;
+    // update our presence doc so others see muted state
+    membersCol().doc(local.id).update({ muted }).catch(()=>{});
+    // update our local badge
+    const localEntry = local.remoteVideoEls['local'];
+    if (localEntry) localEntry.mutedBadge.style.display = muted ? 'block' : 'none';
+    ui.muteBtn.innerText = muted ? 'Unmute' : 'Mute';
+  }
+
+  function toggleCam() {
+    if (!local.localStream) return;
+    const track = local.localStream.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    const off = !track.enabled;
+    ui.camBtn.innerText = off ? 'Camera On' : 'Camera Off';
+  }
+
+  // ---------- Screen sharing ----------
+  ui.shareBtn.addEventListener('click', startScreen);
+
+  async function startScreen() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert('Screen sharing not supported on this device/browser. Use Chrome/Edge/Firefox on desktop.');
+      return;
+    }
+    if (!local.localStream) { alert('Local media not started'); return; }
+
+    // indicate sharing in UI & presence
+    membersCol().doc(local.id).update({ sharing: true }).catch(()=>{});
+    local.sharing = true;
+    showBanner('You are sharing your screen', 3000);
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" } });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      local.screenTrack = screenTrack;
+
+      // replace our outgoing video track in all peer connections
+      Object.keys(local.pcMap).forEach(remoteId => {
+        const pc = local.pcMap[remoteId];
+        const sender = pc.getSenders().find(s => s && s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        }
+      });
+
+      // also show the stage as our screen locally
+      ui.stageVideo.srcObject = screenStream;
+      ui.stageVideo.muted = true; // mute local playback
+      ui.stageTitle.style.display = 'block';
+      ui.stageTitle.innerText = 'You are sharing';
+
+      // When screen share stops (user pressed "Stop sharing" from browser)
+      screenTrack.onended = async () => {
+        // restore camera track
+        const camTrack = local.localStream.getVideoTracks()[0];
+        Object.keys(local.pcMap).forEach(remoteId => {
+          const pc = local.pcMap[remoteId];
+          const sender = pc.getSenders().find(s => s && s.track && s.track.kind === 'video');
+          if (sender && camTrack) sender.replaceTrack(camTrack);
+        });
+        // update stage to camera preview
+        ui.stageVideo.srcObject = local.localStream;
+        ui.stageVideo.muted = true;
+        ui.stageTitle.style.display = 'none';
+        local.sharing = false;
+        // update presence
+        await membersCol().doc(local.id).update({ sharing: false }).catch(()=>{});
+        showBanner('Screen sharing stopped', 2500);
+      };
+
+    } catch(err) {
+      console.error('screen share failed', err);
+      alert('Screen share failed: ' + err);
+      // reset presence flag
+      membersCol().doc(local.id).update({ sharing: false }).catch(()=>{});
+      local.sharing = false;
+    }
+  }
+
+  // ---------- React to members sharing flag: when someone starts sharing show them on stage ----------
+  function startMembersListener() {
+    // already defined earlier; override to include stage handling
+    if (membersUnsub) membersUnsub(); // unsubscribe previous
+    membersUnsub = membersCol().onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        const id = change.doc.id;
+        const data = change.doc.data();
+        if (change.type === "added") {
+          if (id === local.id) return;
+          createRemoteTile(id, data.name, data);
+        } else if (change.type === "modified") {
+          // update mute badge + sharing
+          updateRemoteState(id, data);
+        } else if (change.type === "removed") {
+          removeRemote(id);
+        }
+      });
+      // after processing changes, if someone is sharing show them in stage
+      (async () => {
+        const snap = await membersCol().where('sharing', '==', true).get();
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          const id = doc.id;
+          // if the sharer is us, we already set our stage to our screen; else set stage to their video element
+          if (id === local.id) {
+            // our stage already set in startScreen
+          } else {
+            const entry = local.remoteVideoEls[id];
+            if (entry && entry.video && entry.video.srcObject) {
+              ui.stageVideo.srcObject = entry.video.srcObject;
+              ui.stageVideo.muted = false;
+              ui.stageTitle.style.display = 'block';
+              ui.stageTitle.innerText = doc.data().name + ' is sharing';
+            } else {
+              // remote might not have attached stream yet; wait briefly
+              setTimeout(()=> {
+                const e = local.remoteVideoEls[id];
+                if (e && e.video && e.video.srcObject) {
+                  ui.stageVideo.srcObject = e.video.srcObject;
+                  ui.stageTitle.style.display = 'block';
+                  ui.stageTitle.innerText = doc.data().name + ' is sharing';
+                }
+              }, 1000);
+            }
+          }
+        } else {
+          // no one sharing currently
+          ui.stageTitle.style.display = 'none';
+          // fallback to local preview
+          ui.stageVideo.srcObject = local.localStream;
+          ui.stageVideo.muted = true;
+        }
+      })();
+    });
+  }
+
+  // ---------- Start listening for offers (we are callee if offers to us arrive) ----------
+  function startOffersListener() {
+    if (offersUnsub) offersUnsub();
+    offersUnsub = offersCol().onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(async change => {
+        const data = change.doc.data();
+        const docId = change.doc.id;
+        if (!data) return;
+        // if this offer is directed to me
+        if (data.to === local.id && change.type === 'added') {
+          const fromId = data.from;
+          // create pc if not exists
+          if (!local.pcMap[fromId]) {
+            const pc = makePeerConnection(fromId);
+            local.pcMap[fromId] = pc;
+            // add tracks
+            local.localStream.getTracks().forEach(t => pc.addTrack(t, local.localStream));
+            // set remote description
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+            // create answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            const pairId = `${fromId}_${local.id}`;
+            await answersCol().doc(pairId).set({
+              from: local.id,
+              to: fromId,
+              sdp: answer.sdp,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            // listen for candidate docs for pairId
+            const candidateSub = candidatesCol(pairId).onSnapshot(snap2 => {
+              snap2.docChanges().forEach(change2 => {
+                if (change2.type === 'added') {
+                  const cand = change2.doc.data();
+                  if (cand && cand.candidate) {
+                    pc.addIceCandidate(new RTCIceCandidate(cand.candidate)).catch(e => console.warn('addIce', e));
+                  }
+                }
+              });
+            });
+            pc._firestoreCandidatesSub = candidateSub;
+          }
+        }
+      });
+    });
+  }
+
+  // ---------- Clean up on unload ----------
+  window.addEventListener('beforeunload', async () => {
+    try { await clearPresence(); } catch(e){}
+  });
+
+  // ---------- Safety: periodically clean broken offers/answers older than X minutes (optional) ----------
+  // Not implemented here - in production you can implement TTL cleanup Cloud Function.
+
+  // ---------- End of script ----------
+  </script>
 </body>
 </html>
