@@ -1,66 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SAROJ PRODUCTION PANEL</title>
+    <title>SAROJ PRODUCTION MULTI TEAM</title>
     <style>
-        body { font-family: Arial; background: #0d0d0d; color: white; text-align: center; }
-        #loginBox, #callBox { margin-top: 40px; }
-        input { padding: 10px; width: 260px; margin: 6px; border-radius: 6px; border: none; }
-        button { padding: 10px 20px; border: none; background: #7b2cff; color: white; border-radius: 6px; cursor: pointer; }
-        .videoContainer { display: inline-block; position: relative; margin:10px; }
-        video { width: 45%; border-radius: 6px; background: black; }
+        body { font-family: Arial; background:#0d0d0d; color:white; text-align:center; }
+        #loginBox, #callBox { margin-top:20px; }
+        input { padding:10px; width:220px; margin:5px; border-radius:6px; border:none; }
+        button { padding:10px 20px; margin:5px; border:none; background:#7b2cff; color:white; border-radius:6px; cursor:pointer; }
+        .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:10px; margin-top:20px; }
+        .videoContainer { position:relative; }
+        video { width:100%; border-radius:6px; background:black; }
         .muteOverlay {
-            position: absolute;
-            top: 5px; left: 5px;
-            background: red;
-            color: white;
-            font-weight: bold;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: none;
-            z-index: 10;
+            position:absolute; top:5px; left:5px;
+            background:red; color:white; font-weight:bold; padding:4px 8px; border-radius:4px; display:none;
+            z-index:10;
         }
-        #controls button { margin: 5px; }
     </style>
 </head>
 <body>
 
-<h1>SAROJ PRODUCTION PANEL</h1>
-<h3>Admin + Teams | Video Call | Screen Share | Mute | Camera</h3>
+<h1>SAROJ PRODUCTION MULTI TEAM</h1>
+<h3>Up to 5 management teams | Video Call | Screen Share | Mute</h3>
 
 <div id="loginBox">
-    <h2>Login</h2>
-    <input id="username" placeholder="Enter username"><br>
-    <input id="password" type="password" placeholder="Enter password (Admin only)"><br>
-    <button onclick="login()">Login</button>
+    <input id="username" placeholder="Enter name"><br>
+    <input id="password" type="password" placeholder="Admin password (12345)"><br>
+    <button onclick="login()">Join Room</button>
 </div>
 
 <div id="callBox" style="display:none;">
-    <h2>Connected to: production-room</h2>
-
-    <div class="videoContainer">
-        <video id="localVideo" autoplay playsinline muted></video>
-        <div id="muteOverlay" class="muteOverlay">MUTED</div>
-    </div>
-
-    <div class="videoContainer">
-        <video id="remoteVideo" autoplay playsinline></video>
-    </div>
-
-    <div id="controls">
+    <div>
         <button onclick="toggleMic()">Mute / Unmute</button>
         <button onclick="toggleCam()">Camera On / Off</button>
         <button onclick="startScreen()">Share Screen</button>
+    </div>
+    <div class="grid" id="videoGrid">
+        <div class="videoContainer">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div id="localMuteOverlay" class="muteOverlay">MUTED</div>
+        </div>
     </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
 <script>
-/////////////////////////////
-// FIREBASE CONFIG
-/////////////////////////////
+//////////////// FIREBASE CONFIG //////////////////
 const firebaseConfig = {
   apiKey: "AIzaSyAHmfSYuO4kZesR1olmDxEYEYe3kXl0q_Y",
   authDomain: "business-bfddf.firebaseapp.com",
@@ -73,107 +58,108 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-/////////////////////////////
-// GLOBAL VARIABLES
-/////////////////////////////
-const roomName = "production-room";
-let pc;
-let localStream;
-let remoteStream;
-let micEnabled = true;
-let camEnabled = true;
+//////////////// GLOBAL //////////////////
+const roomName="production-room";
+let localStream, micEnabled=true, camEnabled=true;
+let peers={} // userId -> pc
+let localId;
+let remoteStreams={} // userId -> video element
 
-/////////////////////////////
-// LOGIN
-/////////////////////////////
-function login() {
-    let user = document.getElementById("username").value;
-    let pass = document.getElementById("password").value;
-
-    if (user === "admin" && pass === "12345") startCall();
-    else if (user !== "" && pass === "") startCall();
-    else { alert("Wrong login!"); return; }
-
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("callBox").style.display = "block";
+//////////////// LOGIN //////////////////
+function login(){
+    let user=document.getElementById("username").value;
+    let pass=document.getElementById("password").value;
+    if(!user){ alert("Enter name"); return;}
+    if(user==="admin" && pass!=="12345"){ alert("Wrong admin pass"); return;}
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("callBox").style.display="block";
+    localId=user+"_"+Date.now();
+    startCall();
 }
 
-/////////////////////////////
-// START VIDEO CALL
-/////////////////////////////
-async function startCall() {
-    localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } },
-        audio: true
-    });
-    document.getElementById("localVideo").srcObject = localStream;
+//////////////// START CALL //////////////////
+async function startCall(){
+    localStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1920},height:{ideal:1080}}, audio:true});
+    document.getElementById("localVideo").srcObject=localStream;
+    listenNewUsers();
+}
 
-    pc = new RTCPeerConnection({ iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }] });
-
-    remoteStream = new MediaStream();
-    document.getElementById("remoteVideo").srcObject = remoteStream;
-
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-    pc.ontrack = event => event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-
-    pc.onicecandidate = event => {
-        if (event.candidate) db.collection(roomName).doc("candidates").collection("all").add(event.candidate.toJSON());
-    };
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await db.collection(roomName).doc("offer").set({ type: "offer", sdp: offer.sdp });
-
-    db.collection(roomName).doc("answer").onSnapshot(async snapshot => {
-        if (snapshot.exists && !pc.currentRemoteDescription) {
-            await pc.setRemoteDescription(new RTCSessionDescription(snapshot.data()));
-        }
-    });
-
-    db.collection(roomName).doc("candidates").collection("all").onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-            if (change.type === "added") pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+//////////////// LISTEN NEW USERS //////////////////
+function listenNewUsers(){
+    db.collection(roomName).onSnapshot(snapshot=>{
+        snapshot.docChanges().forEach(change=>{
+            let data=change.doc.data();
+            if(change.type==="added" && data.userId!==localId){
+                if(!peers[data.userId]) createPeerConnection(data.userId);
+            }
         });
     });
 }
 
-/////////////////////////////
-// CONTROLS
-/////////////////////////////
-function toggleMic() {
-    micEnabled = !micEnabled;
-    localStream.getAudioTracks()[0].enabled = micEnabled;
-    document.getElementById("muteOverlay").style.display = micEnabled ? "none" : "block";
-}
+//////////////// CREATE PEER CONNECTION //////////////////
+async function createPeerConnection(remoteId){
+    const pc=new RTCPeerConnection({iceServers:[{urls:["stun:stun.l.google.com:19302"]}]});
+    peers[remoteId]=pc;
 
-function toggleCam() {
-    camEnabled = !camEnabled;
-    localStream.getVideoTracks()[0].enabled = camEnabled;
-}
+    // remote stream
+    const remoteStream=new MediaStream();
+    remoteStreams[remoteId]=remoteStream;
+    const videoContainer=document.createElement("div");
+    videoContainer.className="videoContainer";
+    const video=document.createElement("video");
+    video.autoplay=true; video.playsInline=true;
+    video.srcObject=remoteStream;
+    const overlay=document.createElement("div");
+    overlay.className="muteOverlay"; overlay.innerText="MUTED";
+    videoContainer.appendChild(video); videoContainer.appendChild(overlay);
+    document.getElementById("videoGrid").appendChild(videoContainer);
 
-async function startScreen() {
-    try {
-        let screenStream;
-        if (navigator.mediaDevices.getDisplayMedia) {
-            screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
-            });
-        } else if (navigator.getDisplayMedia) {
-            screenStream = await navigator.getDisplayMedia({ video: true });
-        } else {
-            alert("Screen share is not supported on this device/browser.");
-            return;
+    pc.ontrack=event=> event.streams[0].getTracks().forEach(track=>remoteStream.addTrack(track));
+
+    pc.onicecandidate=event=>{ if(event.candidate) db.collection(roomName).doc(remoteId+"_candidates").set({candidate:event.candidate.toJSON()}); }
+
+    localStream.getTracks().forEach(track=> pc.addTrack(track, localStream));
+
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    db.collection(roomName).doc(localId+"_offer_"+remoteId).set({userId:localId, sdp:offer.sdp, type:"offer"});
+
+    // listen for answer
+    db.collection(roomName).doc(remoteId+"_answer_"+localId).onSnapshot(async snap=>{
+        if(snap.exists){
+            await pc.setRemoteDescription({type:"answer", sdp:snap.data().sdp});
         }
+    });
+}
 
-        const screenTrack = screenStream.getTracks()[0];
-        const sender = pc.getSenders().find(s => s.track.kind === "video");
-        sender.replaceTrack(screenTrack);
+//////////////// CONTROLS //////////////////
+function toggleMic(){
+    micEnabled=!micEnabled;
+    localStream.getAudioTracks()[0].enabled=micEnabled;
+    document.getElementById("localMuteOverlay").style.display=micEnabled?"none":"block";
+}
 
-        screenTrack.onended = () => sender.replaceTrack(localStream.getVideoTracks()[0]);
-    } catch(err) {
-        alert("Screen share failed: " + err);
-    }
+function toggleCam(){
+    camEnabled=!camEnabled;
+    localStream.getVideoTracks()[0].enabled=camEnabled;
+}
+
+async function startScreen(){
+    try{
+        let screenStream;
+        if(navigator.mediaDevices.getDisplayMedia){
+            screenStream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1920},height:{ideal:1080}}});
+        }else{ alert("Screen share not supported"); return;}
+        const track=screenStream.getTracks()[0];
+        Object.values(peers).forEach(pc=>{
+            const sender=pc.getSenders().find(s=>s.track.kind==="video");
+            sender.replaceTrack(track);
+        });
+        track.onended=()=>{ Object.values(peers).forEach(pc=>{
+            const sender=pc.getSenders().find(s=>s.track.kind==="video");
+            sender.replaceTrack(localStream.getVideoTracks()[0]);
+        });}
+    }catch(err){ alert("Screen share failed: "+err);}
 }
 </script>
 </body>
